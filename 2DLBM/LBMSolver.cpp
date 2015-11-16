@@ -6,25 +6,27 @@ w({ { 4. / 9., 1. / 9., 1. / 9., 1. / 9., 1. / 9., 1. / 36., 1. / 36., 1. / 36.,
 ex({ { 0, 1, -1, 0, 0, 1, -1, 1, -1 } }),
 ey({ { 0, 0, 0, 1, -1, -1, -1, 1, 1 } }),
 finv({ { 0, 2, 1, 4, 3, 8, 7, 6, 5 } }),
-g({ { 0, -9.8} }),
 current(0),
 other(1)
 {
 
 }
 
-void LBMSolver::Create(double nu, double sig, double dum, double rho, double dx, double size, double time)
+void LBMSolver::Create(double nu, double sig, double fx, double fy, double rho, double dx, double size, double time)
 {
 	cellSize = dx;
-	//f[0] = 0.0;
-	//f[1] = -9.8;
-
+	
 	//Compute necessary information from input parameters
-	dt = sqrt((1e-4*cellSize) / 9.8);
-	dt = dx;
+	dt = sqrt((1e-4*cellSize) / sqrt(fx*fx+fy*fy));    // So g is not larger than 1e-4. 
+	//dt = 1e-4 / sqrt(fx*fx + fy*fy);
+	//cellSize = dt;
+	//fx = 0;
+	//fy = 0;
+	//dt = dx;
+	g[0] = fx*(dt*dt) / cellSize;
+	g[1] = fy*(dt*dt) / cellSize;
 	double nuStar = nu*(dt / (cellSize*cellSize));
 	tau = (6 * nuStar + 1) / 2;
-	//tau = 1;
 	if (tau < 0.5 || tau > 2.5)
 	{
 		std::ostringstream strs;
@@ -132,11 +134,11 @@ void LBMSolver::TimeStep(double t)
 				mesh[current][ij].u[1] = uy;
 
 				//Collision: apply body forces
-				//if (mesh[current][ij].BC != FIXEDV)   //THIS PART IS JUST TO TEST. IT WILL NOT BE HERE FOR THE DEFINITIVE MODEL, SINCE IT DOES NOT CONSERVE MASS.
-				//{
-				//	ux += tau*g[0];
-				//	uy += tau*g[1];
-				//}
+				if (mesh[current][ij].BC != FIXEDV)  
+				{
+					ux += tau*g[0];
+					uy += tau*g[1];
+				}
 				
 				//Collision: equilibrium function (Eq 3.57 of A single-phase free surface LBM by Nils Thurey)
 				double c = cellSize / dt;
@@ -145,18 +147,22 @@ void LBMSolver::TimeStep(double t)
 					double eDotu = ex[l] * ux + ey[l] * uy;
 					//double f0 = w[l] *( rho - 3. / 2.*(ux*ux + uy*uy)/(c*c) + 3.*eDotu/(c*c) + 9. / 2.*(eDotu*eDotu)/(c*c*c*c));
 
-					double f0 = w[l] *rho*(1 - (3.*(ux*ux + uy*uy)) / (2*c*c) + (3.*eDotu) / (c*c) + (9.*eDotu*eDotu) / (2.*c*c*c*c));  //Eq 3.45 of A single-phase free surface LBM by Nils Thurey
-					//double f0 = w[l] * rho*(1 - (3.*(ux*ux + uy*uy)) / (2 * c*c) + (3.*eDotu) / (c) + (9.*eDotu*eDotu) / (2.*c*c));
-					
+					//double f0 = w[l] *rho*(1 - (3.*(ux*ux + uy*uy)) / (2*c*c) + (3.*eDotu) / (c*c) + (9.*eDotu*eDotu) / (2.*c*c*c*c));  //Eq 3.45 of A single-phase free surface LBM by Nils Thurey
+					//double f0 = w[l] * rho*(1 - (3.*(ux*ux + uy*uy)) / (2 * c*c) + (3.*eDotu) / (c) + (9.*eDotu*eDotu) / (2.*c*c));		
 					
 					
 					//double f0 = w[l] * (rho - 3. / 2.*(ux*ux + uy*uy) + 3.*eDotu  + 9. / 2.*(eDotu*eDotu));
 					
-					//double f0 = w[l] * rho*(1 - (3.*(ux*ux + uy*uy)) / 2. + (3.*eDotu) + (9.*eDotu*eDotu) / 2.);
+					double f0 = w[l] * rho*(1 - (3.*(ux*ux + uy*uy)) / 2. + (3.*eDotu) + (9.*eDotu*eDotu) / 2.);
 					mesh[current][ij].f[l] = mesh[current][ij].f[l] - (1 / tau)*(mesh[current][ij].f[l] - f0);
 				}
 
-
+				//Collision: Calculate velocities for display and particle tracing. 
+				if (mesh[current][ij].BC != FIXEDV)
+				{
+					mesh[current][ij].u[0] += 0.5*tau*g[0];
+					mesh[current][ij].u[1] += 0.5*tau*g[1];
+				}
 			}
 		}
 		//Swap meshes
@@ -174,7 +180,7 @@ void LBMSolver::Render()
 	//I have to paint mesh[other]
 
      // b. points
-	 float psize = 5.;
+	 float psize = 6;
      glPointSize(psize);   // 3 pixel point. why it only works outside of glBegin-glEnd.
      glBegin ( GL_POINTS );
 	 std::vector<double> ux, uy,mod;
@@ -185,13 +191,6 @@ void LBMSolver::Render()
 			 ux.push_back(mesh[other][index(i, j)].u[0]);
 			 uy.push_back(mesh[other][index(i, j)].u[1]);
 		     mod.push_back(sqrt(ux.back()*ux.back() + uy.back()*uy.back()));
-				/* double colour1=1.0, colour2=1.0;
-				 if (speed <= 0.005)
-					 colour1 = -100 * speed + 1;
-				 else
-					 colour2 = -100 * speed + 1;*/
-			 //double colour = -100 * speed + 1;
-			 //double colour = -100 * mod.back() + 1;
 			 double lambda;// = mod.back() / 0.2;
 			 double colourx, coloury, colourz;
 			 if (mod.back() <= 0.04)
