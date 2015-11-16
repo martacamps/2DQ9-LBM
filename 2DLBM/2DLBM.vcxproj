@@ -143,6 +143,8 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="cSolver.h" />
+    <ClInclude Include="glut.h" />
     <ClInclude Include="LBMCell.h" />
     <ClInclude Include="LBMSolver.h" />
     <ClInclude Include="Matrix3D.h" />
@@ -150,6 +152,7 @@
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="cSolver.cpp" />
     <ClCompile Include="LBM2D.cpp" />
     <ClCompile Include="LBMSolver.cpp" />
     <ClCompile Include="stdafx.cpp">

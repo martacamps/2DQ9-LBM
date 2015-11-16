@@ -10,9 +10,11 @@
 #include <stdio.h>
 #include <tchar.h>
 #include <array>
+#include <vector>
 #include <exception>
 #include <iostream>
 #include <sstream>
+#include "glut.h"
 
 
 

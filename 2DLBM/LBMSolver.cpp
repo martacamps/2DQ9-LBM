@@ -1,21 +1,30 @@
 #include "stdafx.h"
 #include "LBMSolver.h"
 
-
-LBMSolver::LBMSolver(double nu, double sig, double g, double rho, double dx, double size, double time) :
+LBMSolver::LBMSolver() :
 w({ { 4. / 9., 1. / 9., 1. / 9., 1. / 9., 1. / 9., 1. / 36., 1. / 36., 1. / 36., 1. / 36. } }),
 ex({ { 0, 1, -1, 0, 0, 1, -1, 1, -1 } }),
 ey({ { 0, 0, 0, 1, -1, -1, -1, 1, 1 } }),
 finv({ { 0, 2, 1, 4, 3, 8, 7, 6, 5 } }),
+g({ { 0, -9.8} }),
 current(0),
-other(1),
-cellSize(dx),
-f(g)
+other(1)
 {
+
+}
+
+void LBMSolver::Create(double nu, double sig, double dum, double rho, double dx, double size, double time)
+{
+	cellSize = dx;
+	//f[0] = 0.0;
+	//f[1] = -9.8;
+
 	//Compute necessary information from input parameters
-	dt = sqrt((1e-4*cellSize) / f);
+	dt = sqrt((1e-4*cellSize) / 9.8);
+	dt = dx;
 	double nuStar = nu*(dt / (cellSize*cellSize));
 	tau = (6 * nuStar + 1) / 2;
+	//tau = 1;
 	if (tau < 0.5 || tau > 2.5)
 	{
 		std::ostringstream strs;
@@ -28,38 +37,44 @@ f(g)
 	numCells = (int)std::round(size / cellSize);
 	numSteps = (int)std::round(time / dt);
 
+	double Re = (0.4*size) / nu;
+
 	//Create LBM mesh. 
 	mesh = new LBMCell*[2];
 	mesh[current] = new LBMCell[numCells*numCells];
 	mesh[other] = new LBMCell[numCells*numCells];
 }
 
-void LBMSolver::init()  //This can input the type of simulation or the initial field
+void LBMSolver::InitialField()  //This can input the type of simulation or the initial field
 {
 	//Set the tags for the BC.
 	for (int j = 0; j < numCells; j++)
 	{
 		mesh[current][index(0, j)].tag = NOSLIPBC;
 		mesh[current][index(numCells - 1, j)].tag = NOSLIPBC;
-		mesh[current][index(numCells - 2, j)].BC = FIXEDV;
-		int ue = index(numCells - 2, j);
+		
 		mesh[other][index(0, j)].tag = NOSLIPBC;
 		mesh[other][index(numCells - 1, j)].tag = NOSLIPBC;
-		mesh[other][index(numCells - 2, j)].BC = FIXEDV;
 	}
 	for (int i = 1; i < (numCells - 1); i++)
 	{
+
 		mesh[current][index(i, 0)].tag = NOSLIPBC;
 		mesh[current][index(i, numCells - 1)].tag = NOSLIPBC;
 		mesh[other][index(i, 0)].tag = NOSLIPBC;
 		mesh[other][index(i, numCells - 1)].tag = NOSLIPBC;
 	}
+	for (int j = 1; j < (numCells - 1); j++)
+	{
+		mesh[current][index(numCells - 2, j)].BC = FIXEDV;
+		mesh[other][index(numCells - 2, j)].BC = FIXEDV;
+	}
 }
 
-void LBMSolver::mainLoop()
+void LBMSolver::TimeStep(double t)
 {
-	for (int t = 0; t < numSteps; t++)
-	{
+	//for (int t = 0; t < numSteps; t++)
+	//{
 		for (int i = 1; i < numCells-1; i++)
 		{
 			for (int j = 1; j < numCells-1; j++)
@@ -97,47 +112,185 @@ void LBMSolver::mainLoop()
 				double rho = 0.0, ux = 0.0, uy = 0.0;
 				if (mesh[current][ij].BC == FIXEDV)   //THIS PART IS JUST TO TEST. IT WILL NOT BE HERE FOR THE DEFINITIVE MODEL, SINCE IT DOES NOT CONSERVE MASS.
 				{
-					mesh[current][ij].rho = 1;
-					mesh[current][ij].u[0] = 0.01;
-					mesh[current][ij].u[1] = 0;
+					rho = 1.; ux = 0.4; uy = 0.0;
 				}
 				else
 				{
+					double fi;
 					for (int l = 0; l < finv.size(); l++)
 					{
-						double fi = mesh[current][ij].f[l];
+						fi = mesh[current][ij].f[l];
 						rho += fi;
 						ux += fi*ex[l];
 						uy += fi*ey[l];
 					}
-					mesh[current][ij].rho = rho;
-					mesh[current][ij].u[0] = ux;
-					mesh[current][ij].u[1] = uy;
+					ux = ux / rho;
+					uy = uy / rho;
 				}
+				mesh[current][ij].rho = rho;
+				mesh[current][ij].u[0] = ux;
+				mesh[current][ij].u[1] = uy;
+
+				//Collision: apply body forces
+				//if (mesh[current][ij].BC != FIXEDV)   //THIS PART IS JUST TO TEST. IT WILL NOT BE HERE FOR THE DEFINITIVE MODEL, SINCE IT DOES NOT CONSERVE MASS.
+				//{
+				//	ux += tau*g[0];
+				//	uy += tau*g[1];
+				//}
 				
-
-				//COLLISION: APPLY BODY FORCES.
-
 				//Collision: equilibrium function (Eq 3.57 of A single-phase free surface LBM by Nils Thurey)
-				double c2 = pow(2, cellSize / dt);
+				double c = cellSize / dt;
 				for (int l = 0; l < finv.size(); l++)
 				{
 					double eDotu = ex[l] * ux + ey[l] * uy;
-					double f0 = w[l] *( rho - 3. / 2.*(ux*ux + uy*uy)/c2 + 3.*eDotu/c2 + 9. / 2.*(eDotu*eDotu)/(c2*c2));
-					mesh[current][ij].f[l] = mesh[current][ij].f[l] - 1 / tau*(mesh[current][ij].f[l] - f0);
+					//double f0 = w[l] *( rho - 3. / 2.*(ux*ux + uy*uy)/(c*c) + 3.*eDotu/(c*c) + 9. / 2.*(eDotu*eDotu)/(c*c*c*c));
+
+					double f0 = w[l] *rho*(1 - (3.*(ux*ux + uy*uy)) / (2*c*c) + (3.*eDotu) / (c*c) + (9.*eDotu*eDotu) / (2.*c*c*c*c));  //Eq 3.45 of A single-phase free surface LBM by Nils Thurey
+					//double f0 = w[l] * rho*(1 - (3.*(ux*ux + uy*uy)) / (2 * c*c) + (3.*eDotu) / (c) + (9.*eDotu*eDotu) / (2.*c*c));
+					
+					
+					
+					//double f0 = w[l] * (rho - 3. / 2.*(ux*ux + uy*uy) + 3.*eDotu  + 9. / 2.*(eDotu*eDotu));
+					
+					//double f0 = w[l] * rho*(1 - (3.*(ux*ux + uy*uy)) / 2. + (3.*eDotu) + (9.*eDotu*eDotu) / 2.);
+					mesh[current][ij].f[l] = mesh[current][ij].f[l] - (1 / tau)*(mesh[current][ij].f[l] - f0);
 				}
+
+
 			}
 		}
 		//Swap meshes
 		other = current;
 		current = 1 - other;
 		std::cout << t << std::endl;
-	}
+	//}
+}
+
+void LBMSolver::Render()
+{
+	glClear(GL_COLOR_BUFFER_BIT);
+	glLoadIdentity();
+
+	//I have to paint mesh[other]
+
+     // b. points
+	 float psize = 5.;
+     glPointSize(psize);   // 3 pixel point. why it only works outside of glBegin-glEnd.
+     glBegin ( GL_POINTS );
+	 std::vector<double> ux, uy,mod;
+     for(int i=0; i<numCells; i++)  // draw point at every grid intersection
+     {
+		 for (int j = 0; j < numCells; j++)
+		 {
+			 ux.push_back(mesh[other][index(i, j)].u[0]);
+			 uy.push_back(mesh[other][index(i, j)].u[1]);
+		     mod.push_back(sqrt(ux.back()*ux.back() + uy.back()*uy.back()));
+				/* double colour1=1.0, colour2=1.0;
+				 if (speed <= 0.005)
+					 colour1 = -100 * speed + 1;
+				 else
+					 colour2 = -100 * speed + 1;*/
+			 //double colour = -100 * speed + 1;
+			 //double colour = -100 * mod.back() + 1;
+			 double lambda;// = mod.back() / 0.2;
+			 double colourx, coloury, colourz;
+			 if (mod.back() <= 0.04)
+			 {
+				 lambda = mod.back() / 0.04;
+				 colourx = lambda;
+				 coloury = lambda;
+				 colourz = 1-lambda;
+			 }
+			 else if ((mod.back()> 0.04) &&  (mod.back()<= 0.08))
+			 {
+				 lambda = mod.back() / 0.04 - 1;
+				 colourx = 1;
+				 coloury = 1-0.45*lambda;
+				 colourz = 0;
+			 }
+			 else if ((mod.back()> 0.08) && (mod.back() <= 0.12))
+			 {
+				 lambda = mod.back() / 0.04 - 2;
+				 colourx = 1;
+				 coloury = 0.55 - 0.55*lambda;
+				 colourz = 0;
+			 }
+			 else if ((mod.back()> 0.12) && (mod.back() <= 0.16))
+			 {
+				 lambda = mod.back() / 0.04 - 3;
+				 colourx = 1-0.42*lambda;
+				 coloury = 0;
+				 colourz = 0.83*lambda;
+			 }
+			 else if ((mod.back()> 0.16) && (mod.back() <= 0.4))
+			 {
+				 lambda = mod.back() / 0.24 - 0.67;
+				 colourx = 0.58 + 0.42*lambda;
+				 coloury = lambda;
+				 colourz = 0.83+0.17*lambda;
+			 }
+			 else
+			 {
+				 colourx = 0.29;
+				 coloury = 0;
+				 colourz = 0.51;
+				 double wtf = mod.back();
+			 }
+			 
+			 if (mesh[other][index(i, j)].tag == NOSLIPBC)
+				 glColor3f(0.0, 1.0, 0.0);
+			 else
+				 glColor3f(colourx, coloury, colourz);
+
+			 glVertex2f(i*psize, j*psize);       
+			 /*if (mesh[other][index(i, j)].tag == NOSLIPBC)
+			 {
+				 glColor3f(1.0, 0.0, 0.0);
+			 } 
+			 else
+			 {
+				 if (mesh[other][index(i, j)].BC == FIXEDV)
+				 {
+					 glColor3f(0.0, 0.0, 1.0);
+				 }
+				 else
+				 {
+					glColor3f(0.0, 1.0, 0.0);
+				 }
+				 
+			 }	
+			 glVertex2f(j * 20, i * 20);*/
+        }
+     }
+     glEnd();
+
+	 glBegin(GL_LINES);
+	 glColor3f(0., 0.0, 0.);
+	 for (int i = 0; i < numCells; i++)  // draw point at every grid intersection
+	 {
+		 for (int j = 0; j < numCells; j++)
+		 {
+			 glVertex2f(i * psize,j * psize);
+			 glVertex2f(i * psize + (uy[index(i, j)] * psize) / mod[index(i, j)], j * psize + (ux[index(i, j)]*psize)/mod[index(i,j)]);
+		 }
+	 }
+	 glEnd();
+
+
+	glutSwapBuffers();
 }
 
 LBMSolver::~LBMSolver()
 {
-	delete mesh[0];
-	delete mesh[1];
-	delete mesh;
+	if (mesh)
+	{
+		delete mesh[0];
+		delete mesh[1];
+		delete mesh;
+	}
+	
+
+	//std::cout << "deleting mesh " << std::endl;
+
+	//DELETE ALSO THE VECTOR SAVED
 }
