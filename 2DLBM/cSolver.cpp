@@ -2,6 +2,7 @@
 #include "cSolver.h"
 
 
+
 cSolver::cSolver() : t(0)
 {
 }
@@ -19,6 +20,7 @@ void cSolver::Init(int i_renderStep)
 	glLoadIdentity();
 	glOrtho(0, GAME_WIDTH, 0, GAME_HEIGHT, 0, 1);
 	glMatrixMode(GL_MODELVIEW);
+
 
 	//Solver initialization
 	renderStep = i_renderStep;

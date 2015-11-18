@@ -3,6 +3,7 @@
 #define GAME_WIDTH	1000
 #define GAME_HEIGHT 1000
 
+
 class cSolver
 {
 public:
@@ -33,6 +34,7 @@ protected:
 	int numSteps, renderStep;
 	unsigned char keys[256];
 	int t;             //Number of loops performed by the program
+
 	 
 	
 };

@@ -1,30 +1,27 @@
 #include "stdafx.h"
 #include "LBMSolver.h"
+#include "cColourGraph.h"
 
 LBMSolver::LBMSolver() :
 w({ { 4. / 9., 1. / 9., 1. / 9., 1. / 9., 1. / 9., 1. / 36., 1. / 36., 1. / 36., 1. / 36. } }),
 ex({ { 0, 1, -1, 0, 0, 1, -1, 1, -1 } }),
 ey({ { 0, 0, 0, 1, -1, -1, -1, 1, 1 } }),
 finv({ { 0, 2, 1, 4, 3, 8, 7, 6, 5 } }),
-g({ { 0, -9.8} }),
 current(0),
 other(1)
 {
 
 }
 
-void LBMSolver::Create(double nu, double sig, double dum, double rho, double dx, double size, double time)
+void LBMSolver::Create(double nu, double sig, double v, double rho, double dx, double size, double time)
 {
 	cellSize = dx;
-	//f[0] = 0.0;
-	//f[1] = -9.8;
+	lidSpeed = v;
 
 	//Compute necessary information from input parameters
-	dt = sqrt((1e-4*cellSize) / 9.8);
-	dt = dx;
+	dt = cellSize;
 	double nuStar = nu*(dt / (cellSize*cellSize));
 	tau = (6 * nuStar + 1) / 2;
-	//tau = 1;
 	if (tau < 0.5 || tau > 2.5)
 	{
 		std::ostringstream strs;
@@ -37,7 +34,7 @@ void LBMSolver::Create(double nu, double sig, double dum, double rho, double dx,
 	numCells = (int)std::round(size / cellSize);
 	numSteps = (int)std::round(time / dt);
 
-	double Re = (0.4*size) / nu;
+	double Re = (lidSpeed*size) / nu;
 
 	//Create LBM mesh. 
 	mesh = new LBMCell*[2];
@@ -73,97 +70,66 @@ void LBMSolver::InitialField()  //This can input the type of simulation or the i
 
 void LBMSolver::TimeStep(double t)
 {
-	//for (int t = 0; t < numSteps; t++)
-	//{
-		for (int i = 1; i < numCells-1; i++)
+	
+	for (int i = 1; i < numCells-1; i++)
+	{
+		for (int j = 1; j < numCells-1; j++)
 		{
-			for (int j = 1; j < numCells-1; j++)
+			int ij = index(i, j);
+
+			//Streaming. 
+			for (int l = 0; l < finv.size(); l++)
 			{
-				int ij = index(i, j);
-				//MASS EXCHANGE AND CELL TYPE UPDATE. 
+				int inv = finv[l];
+				int previous = index(i + ey[inv], j + ex[inv]);
 
-				//THERE IS AN IF (OR A CASE) MISSING,SINCE GAS, LIQUID AND INTERFACE CELLS HAVE TO BE TREATED DIFFERENTLY. 
+				//check the type of the neighbour cell and perform streaming
+				if (mesh[other][previous].tag == NOSLIPBC)  //The neighbour cell is a non slip wall
+				{
+					mesh[current][ij].f[l] = mesh[current][ij].f[inv];
+				}
+				else   //The neighbour cell is fluid
+				{
+					mesh[current][ij].f[l] = mesh[other][previous].f[l];
+				}     
+			}
 
-				//Streaming. (I HAVE TO CHECK IF I CAN DO ALL THE L LOOPS IN ONE OR NOT. I KNOW I CAN'T IN THE COLLISION STEP, BUT MAYBE I CAN IN ALL THE OTHER STEPS. 
+			//Collision
+			double rho = 0.0, ux = 0.0, uy = 0.0;
+			if (mesh[current][ij].BC == FIXEDV)   //Fix the density and velocity for the cells marked as FIXEDV (the lid cells)
+			{
+				rho = 1.; ux = lidSpeed; uy = 0.0;
+			}
+			else   //calculate density and velocity 
+			{
+				double fi;
 				for (int l = 0; l < finv.size(); l++)
 				{
-					int inv = finv[l];
-					int previous = index(i + ey[inv], j + ex[inv]);
-					//check the type of the neighbour cell
-					if (mesh[other][previous].tag == NOSLIPBC)
-					{
-						mesh[current][ij].f[l] = mesh[current][ij].f[inv];
-					}
-					else if (mesh[other][previous].tag == SLIPBC)
-					{
-						//IMPLEMENT SLIP BC
-						//IT HAS TO HAVE CHECKS FOR INTERFACE CELLS ALSO, AND MAYBE FOR SOME MORE.
-					}
-					else   //The neighbour cell is fluid
-					{
-						mesh[current][ij].f[l] = mesh[other][previous].f[l];
-					}     
-					//DISTRIBUTION FUNCTIONS RECONSTRUCTION AND SUPERFICIAL FORCES.
-					//MASS UPDATE AND MARK EMPTY/FULL CELL
-					//BUBBLE VOLUME CALCULATION
+					fi = mesh[current][ij].f[l];
+					rho += fi;
+					ux += fi*ex[l];
+					uy += fi*ey[l];
 				}
-
-				//Collision: density and velocity 
-				double rho = 0.0, ux = 0.0, uy = 0.0;
-				if (mesh[current][ij].BC == FIXEDV)   //THIS PART IS JUST TO TEST. IT WILL NOT BE HERE FOR THE DEFINITIVE MODEL, SINCE IT DOES NOT CONSERVE MASS.
-				{
-					rho = 1.; ux = 0.4; uy = 0.0;
-				}
-				else
-				{
-					double fi;
-					for (int l = 0; l < finv.size(); l++)
-					{
-						fi = mesh[current][ij].f[l];
-						rho += fi;
-						ux += fi*ex[l];
-						uy += fi*ey[l];
-					}
-					ux = ux / rho;
-					uy = uy / rho;
-				}
-				mesh[current][ij].rho = rho;
-				mesh[current][ij].u[0] = ux;
-				mesh[current][ij].u[1] = uy;
-
-				//Collision: apply body forces
-				//if (mesh[current][ij].BC != FIXEDV)   //THIS PART IS JUST TO TEST. IT WILL NOT BE HERE FOR THE DEFINITIVE MODEL, SINCE IT DOES NOT CONSERVE MASS.
-				//{
-				//	ux += tau*g[0];
-				//	uy += tau*g[1];
-				//}
-				
-				//Collision: equilibrium function (Eq 3.57 of A single-phase free surface LBM by Nils Thurey)
-				double c = cellSize / dt;
-				for (int l = 0; l < finv.size(); l++)
-				{
-					double eDotu = ex[l] * ux + ey[l] * uy;
-					//double f0 = w[l] *( rho - 3. / 2.*(ux*ux + uy*uy)/(c*c) + 3.*eDotu/(c*c) + 9. / 2.*(eDotu*eDotu)/(c*c*c*c));
-
-					double f0 = w[l] *rho*(1 - (3.*(ux*ux + uy*uy)) / (2*c*c) + (3.*eDotu) / (c*c) + (9.*eDotu*eDotu) / (2.*c*c*c*c));  //Eq 3.45 of A single-phase free surface LBM by Nils Thurey
-					//double f0 = w[l] * rho*(1 - (3.*(ux*ux + uy*uy)) / (2 * c*c) + (3.*eDotu) / (c) + (9.*eDotu*eDotu) / (2.*c*c));
-					
-					
-					
-					//double f0 = w[l] * (rho - 3. / 2.*(ux*ux + uy*uy) + 3.*eDotu  + 9. / 2.*(eDotu*eDotu));
-					
-					//double f0 = w[l] * rho*(1 - (3.*(ux*ux + uy*uy)) / 2. + (3.*eDotu) + (9.*eDotu*eDotu) / 2.);
-					mesh[current][ij].f[l] = mesh[current][ij].f[l] - (1 / tau)*(mesh[current][ij].f[l] - f0);
-				}
-
-
+				ux = ux / rho;
+				uy = uy / rho;
+			}
+			mesh[current][ij].rho = rho;
+			mesh[current][ij].u[0] = ux;
+			mesh[current][ij].u[1] = uy;
+		
+			//Collision
+			for (int l = 0; l < finv.size(); l++)
+			{
+				double eDotu = ex[l] * ux + ey[l] * uy;
+				double f0 = w[l] *rho*(1 - (3.*(ux*ux + uy*uy)) / 2. + (3.*eDotu)  + (9.*eDotu*eDotu) / 2.);  
+				mesh[current][ij].f[l] = mesh[current][ij].f[l] - (1 / tau)*(mesh[current][ij].f[l] - f0);
 			}
 		}
-		//Swap meshes
-		other = current;
-		current = 1 - other;
-		std::cout << t << std::endl;
-	//}
+	}
+	//Swap meshes
+	other = current;
+	current = 1 - other;
+	std::cout << t << std::endl;
 }
 
 void LBMSolver::Render()
@@ -172,12 +138,20 @@ void LBMSolver::Render()
 	glLoadIdentity();
 
 	//I have to paint mesh[other]
+	//Create colour scale (inside the render type switch).
+	std::vector<double> intervals, colours;
+	for (int i = 0; i < 6; i++)
+		intervals.push_back(i*lidSpeed / 5.0);
+	intervals.back() += lidSpeed / 10.0;
+	colours = { 0, 0, 1, 1, 1, 0, 1, 0.55, 0, 1, 0, 0, 0.58, 0, 0.83, 1., 1., 1. };     //blue, yellow, orange, red, purple, white
+	cColourGraph colourScale(&intervals, &colours, 6);
 
-     // b. points
-	 float psize = 5.;
-     glPointSize(psize);   // 3 pixel point. why it only works outside of glBegin-glEnd.
+
+     double psize = glutGet(GLUT_WINDOW_WIDTH)/numCells;
+     glPointSize(psize);   
      glBegin ( GL_POINTS );
 	 std::vector<double> ux, uy,mod;
+	 bool inside;
      for(int i=0; i<numCells; i++)  // draw point at every grid intersection
      {
 		 for (int j = 0; j < numCells; j++)
@@ -185,88 +159,21 @@ void LBMSolver::Render()
 			 ux.push_back(mesh[other][index(i, j)].u[0]);
 			 uy.push_back(mesh[other][index(i, j)].u[1]);
 		     mod.push_back(sqrt(ux.back()*ux.back() + uy.back()*uy.back()));
-				/* double colour1=1.0, colour2=1.0;
-				 if (speed <= 0.005)
-					 colour1 = -100 * speed + 1;
-				 else
-					 colour2 = -100 * speed + 1;*/
-			 //double colour = -100 * speed + 1;
-			 //double colour = -100 * mod.back() + 1;
-			 double lambda;// = mod.back() / 0.2;
 			 double colourx, coloury, colourz;
-			 if (mod.back() <= 0.04)
-			 {
-				 lambda = mod.back() / 0.04;
-				 colourx = lambda;
-				 coloury = lambda;
-				 colourz = 1-lambda;
-			 }
-			 else if ((mod.back()> 0.04) &&  (mod.back()<= 0.08))
-			 {
-				 lambda = mod.back() / 0.04 - 1;
-				 colourx = 1;
-				 coloury = 1-0.45*lambda;
-				 colourz = 0;
-			 }
-			 else if ((mod.back()> 0.08) && (mod.back() <= 0.12))
-			 {
-				 lambda = mod.back() / 0.04 - 2;
-				 colourx = 1;
-				 coloury = 0.55 - 0.55*lambda;
-				 colourz = 0;
-			 }
-			 else if ((mod.back()> 0.12) && (mod.back() <= 0.16))
-			 {
-				 lambda = mod.back() / 0.04 - 3;
-				 colourx = 1-0.42*lambda;
-				 coloury = 0;
-				 colourz = 0.83*lambda;
-			 }
-			 else if ((mod.back()> 0.16) && (mod.back() <= 0.4))
-			 {
-				 lambda = mod.back() / 0.24 - 0.67;
-				 colourx = 0.58 + 0.42*lambda;
-				 coloury = lambda;
-				 colourz = 0.83+0.17*lambda;
-			 }
-			 else
-			 {
-				 colourx = 0.29;
-				 coloury = 0;
-				 colourz = 0.51;
-				 double wtf = mod.back();
-			 }
-			 
-			 if (mesh[other][index(i, j)].tag == NOSLIPBC)
-				 glColor3f(0.0, 1.0, 0.0);
-			 else
+			 inside = colourScale.pickColour(mod.back(), &colourx, &coloury, &colourz);
+			 if (inside)
 				 glColor3f(colourx, coloury, colourz);
+			 else
+				 glColor3f(0., 0., 0.);           //Black colour means value out of range.
 
 			 glVertex2f(i*psize, j*psize);       
-			 /*if (mesh[other][index(i, j)].tag == NOSLIPBC)
-			 {
-				 glColor3f(1.0, 0.0, 0.0);
-			 } 
-			 else
-			 {
-				 if (mesh[other][index(i, j)].BC == FIXEDV)
-				 {
-					 glColor3f(0.0, 0.0, 1.0);
-				 }
-				 else
-				 {
-					glColor3f(0.0, 1.0, 0.0);
-				 }
-				 
-			 }	
-			 glVertex2f(j * 20, i * 20);*/
         }
      }
      glEnd();
 
 	 glBegin(GL_LINES);
 	 glColor3f(0., 0.0, 0.);
-	 for (int i = 0; i < numCells; i++)  // draw point at every grid intersection
+	 for (int i = 0; i < numCells; i++) 
 	 {
 		 for (int j = 0; j < numCells; j++)
 		 {

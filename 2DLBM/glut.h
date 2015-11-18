@@ -69,7 +69,7 @@ typedef unsigned short wchar_t;
 #  endif
 # endif
 
-/* To disable supression of annoying warnings about floats being promoted
+/* To disable supression of annoying warnings about doubles being promoted
    to doubles, define GLUT_NO_WARNING_DISABLE in your compile preprocessor
    options. */
 # ifndef GLUT_NO_WARNING_DISABLE
@@ -598,8 +598,8 @@ GLUTAPI void APIENTRY glutJoystickFunc(void (GLUTCALLBACK *func)(unsigned int bu
 #endif
 
 /* GLUT color index sub-API. */
-GLUTAPI void APIENTRY glutSetColor(int, GLfloat red, GLfloat green, GLfloat blue);
-GLUTAPI GLfloat APIENTRY glutGetColor(int ndx, int component);
+GLUTAPI void APIENTRY glutSetColor(int, GLdouble red, GLdouble green, GLdouble blue);
+GLUTAPI GLdouble APIENTRY glutGetColor(int ndx, int component);
 GLUTAPI void APIENTRY glutCopyColormap(int win);
 
 /* GLUT state retrieval sub-API. */

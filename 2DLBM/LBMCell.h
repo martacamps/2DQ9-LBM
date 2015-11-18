@@ -1,11 +1,6 @@
 #pragma once
 
 #define FLUID 0
-#define GAS 1
-#define INTERFACE 2
-#define IFULL 3
-#define IEMPTY 4
-#define SLIPBC 5
 #define NOSLIPBC 6
 #define FIXEDV 7
 #define INTERNAL 8
