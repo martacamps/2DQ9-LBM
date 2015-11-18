@@ -22,6 +22,7 @@ private:
 	int numCells;						//number of cells in each direction
 	double dt;                          //lenght of each time step in seconds
 	double lidSpeed;                    //Horizontal Speed of the lid
+	double g;							//acceleration of gravity
 	int current, other;
 	LBMCell **mesh;
 	size_t index(int i, int j) { return i*numCells + j; }  //To access the data array as it was a 2DMatrix. Having this here instead of in another class will decrease the calls to other classes every time I want to access a position of the array. 

@@ -54,8 +54,8 @@ int main(int argc, char* argv[])
 
 		//Game initializations
 		cavity.Init(10);    //CREATE AND INITIALIZE WILL BE PART OF INIT WHEN THEY READ THEIR INPUTS FROM FILES. THIS WAY ALL OF THEM WILL NEED THE SAME INPUT PARAMETER (THE NAME OF THE FILE). 
-		//cavity.Create(1e-6, 7e-4, 9.81, 1000, 0.0001, 0.001, 15);
-		cavity.Create(0.01, 7e-4, 1, 1000, 0.0001, 0.1, 15000);
+		cavity.Create(1e-6, 7e-4, 0.5, 1000, 0.000006, 0.001, 150);
+		//cavity.Create(0.01, 7e-4, 1, 1000, 0.0001, 0.1, 15000);
 		cavity.InitialField();
 
 		//Application loop

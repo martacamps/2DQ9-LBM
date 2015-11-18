@@ -17,9 +17,12 @@ void LBMSolver::Create(double nu, double sig, double v, double rho, double dx, d
 {
 	cellSize = dx;
 	lidSpeed = v;
-
+	
 	//Compute necessary information from input parameters
-	dt = cellSize;
+	//dt = cellSize;
+	dt = sqrt((1e-4*cellSize) / 9.81);    // So the gravity acceleration in the model is not larger than 1e-4.
+	g = -9.81*(dt*dt) / cellSize;
+
 	double nuStar = nu*(dt / (cellSize*cellSize));
 	tau = (6 * nuStar + 1) / 2;
 	if (tau < 0.5 || tau > 2.5)
@@ -116,6 +119,12 @@ void LBMSolver::TimeStep(double t)
 			mesh[current][ij].rho = rho;
 			mesh[current][ij].u[0] = ux;
 			mesh[current][ij].u[1] = uy;
+
+			//Collision: apply gravity
+			if (mesh[current][ij].BC != FIXEDV)
+			{
+				uy += tau*g;
+			}
 		
 			//Collision
 			for (int l = 0; l < finv.size(); l++)
@@ -123,6 +132,12 @@ void LBMSolver::TimeStep(double t)
 				double eDotu = ex[l] * ux + ey[l] * uy;
 				double f0 = w[l] *rho*(1 - (3.*(ux*ux + uy*uy)) / 2. + (3.*eDotu)  + (9.*eDotu*eDotu) / 2.);  
 				mesh[current][ij].f[l] = mesh[current][ij].f[l] - (1 / tau)*(mesh[current][ij].f[l] - f0);
+			}
+
+			//Collision: Calculate velocities for display and particle tracing. 
+			if (mesh[current][ij].BC != FIXEDV)
+			{
+				mesh[current][ij].u[1] += 0.5*tau*g;
 			}
 		}
 	}
@@ -142,7 +157,7 @@ void LBMSolver::Render()
 	std::vector<double> intervals, colours;
 	for (int i = 0; i < 6; i++)
 		intervals.push_back(i*lidSpeed / 5.0);
-	intervals.back() += lidSpeed / 10.0;
+	//intervals.back() += lidSpeed / 10.0;
 	colours = { 0, 0, 1, 1, 1, 0, 1, 0.55, 0, 1, 0, 0, 0.58, 0, 0.83, 1., 1., 1. };     //blue, yellow, orange, red, purple, white
 	cColourGraph colourScale(&intervals, &colours, 6);
 
