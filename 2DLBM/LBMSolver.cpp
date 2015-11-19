@@ -1,6 +1,6 @@
 #include "stdafx.h"
 #include "LBMSolver.h"
-#include "cColourGraph.h"
+//#include "cColourGraph.h"
 
 LBMSolver::LBMSolver() :
 w({ { 4. / 9., 1. / 9., 1. / 9., 1. / 9., 1. / 9., 1. / 36., 1. / 36., 1. / 36., 1. / 36. } }),
@@ -43,6 +43,7 @@ void LBMSolver::Create(double nu, double sig, double v, double rho, double dx, d
 	mesh = new LBMCell*[2];
 	mesh[current] = new LBMCell[numCells*numCells];
 	mesh[other] = new LBMCell[numCells*numCells];
+
 }
 
 void LBMSolver::InitialField()  //This can input the type of simulation or the initial field
@@ -91,7 +92,7 @@ void LBMSolver::TimeStep(double t)
 				{
 					mesh[current][ij].f[l] = mesh[current][ij].f[inv];
 				}
-				else   //The neighbour cell is fluid
+				else										//The neighbour cell is fluid
 				{
 					mesh[current][ij].f[l] = mesh[other][previous].f[l];
 				}     
@@ -99,11 +100,11 @@ void LBMSolver::TimeStep(double t)
 
 			//Collision
 			double rho = 0.0, ux = 0.0, uy = 0.0;
-			if (mesh[current][ij].BC == FIXEDV)   //Fix the density and velocity for the cells marked as FIXEDV (the lid cells)
+			if (mesh[current][ij].BC == FIXEDV)         //Fix the density and velocity for the cells marked as FIXEDV (the lid cells)
 			{
 				rho = 1.; ux = lidSpeed; uy = 0.0;
 			}
-			else   //calculate density and velocity 
+			else                                       //calculate density and velocity 
 			{
 				double fi;
 				for (int l = 0; l < finv.size(); l++)
@@ -149,57 +150,112 @@ void LBMSolver::TimeStep(double t)
 
 void LBMSolver::Render()
 {
-	glClear(GL_COLOR_BUFFER_BIT);
-	glLoadIdentity();
+	float win_width = glutGet(GLUT_WINDOW_WIDTH);
+	float win_height = glutGet(GLUT_WINDOW_HEIGHT);
 
-	//I have to paint mesh[other]
-	//Create colour scale (inside the render type switch).
-	std::vector<double> intervals, colours;
-	for (int i = 0; i < 6; i++)
-		intervals.push_back(i*lidSpeed / 5.0);
-	//intervals.back() += lidSpeed / 10.0;
-	colours = { 0, 0, 1, 1, 1, 0, 1, 0.55, 0, 1, 0, 0, 0.58, 0, 0.83, 1., 1., 1. };     //blue, yellow, orange, red, purple, white
-	cColourGraph colourScale(&intervals, &colours, 6);
+	 glClear(GL_COLOR_BUFFER_BIT);
+	 glLoadIdentity();
 
-
-     double psize = glutGet(GLUT_WINDOW_WIDTH)/numCells;
-     glPointSize(psize);   
-     glBegin ( GL_POINTS );
-	 std::vector<double> ux, uy,mod;
-	 bool inside;
-     for(int i=0; i<numCells; i++)  // draw point at every grid intersection
-     {
-		 for (int j = 0; j < numCells; j++)
-		 {
-			 ux.push_back(mesh[other][index(i, j)].u[0]);
-			 uy.push_back(mesh[other][index(i, j)].u[1]);
-		     mod.push_back(sqrt(ux.back()*ux.back() + uy.back()*uy.back()));
-			 double colourx, coloury, colourz;
-			 inside = colourScale.pickColour(mod.back(), &colourx, &coloury, &colourz);
-			 if (inside)
-				 glColor3f(colourx, coloury, colourz);
-			 else
-				 glColor3f(0., 0., 0.);           //Black colour means value out of range.
-
-			 glVertex2f(i*psize, j*psize);       
-        }
-     }
-     glEnd();
-
-	 glBegin(GL_LINES);
-	 glColor3f(0., 0.0, 0.);
-	 for (int i = 0; i < numCells; i++) 
+	 //Set colours and intervals for the selected plot. 
+	 std::vector<double> intervals, colours;
+	 std::string title;
+	 if (vis[2])  //Colours by velocity
 	 {
-		 for (int j = 0; j < numCells; j++)
-		 {
-			 glVertex2f(i * psize,j * psize);
-			 glVertex2f(i * psize + (uy[index(i, j)] * psize) / mod[index(i, j)], j * psize + (ux[index(i, j)]*psize)/mod[index(i,j)]);
-		 }
+		for (int i = 0; i < 6; i++)
+			intervals.push_back(i*lidSpeed / 5.0);
+		colourScale.SetIntervals(&intervals);
+		
+		if (vis[1])   //Colour pallette 1
+			colours = { 0, 0, 1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, };   //blue, cyan, green, yellow, red, magenta
+		else          //Colour pallette 2
+			colours = { 1, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1 };   //magenta, red, yellow, green, cyan, blue
+		colourScale.SetColours(&colours, 6);
+
+		title = "speed[m/s]";
 	 }
-	 glEnd();
+	 else       //Colours by cell tag
+	 {
+		 intervals = { FLUID, NOSLIPBC };
+		 colourScale.SetIntervals(&intervals);
+		 colours = { 0.2, 0.6, 1.0, 0.4, 0.2, 0. };   //light blue, brown.
+		 colourScale.SetColours(&colours, 2);
+		 title = "cell type";
+	 }
 
+	 //Draw and colour the cells of the domain.
+	 double psize = 1; 
+	 glPointSize(psize);
+	 glPushMatrix();
+	 glScalef((0.9*win_width) / (psize*numCells), win_height / (psize*numCells), 1.);
+	 //glBegin(GL_POINTS);
+	 std::vector<double> ux, uy, mod;
+	 double colourx, coloury, colourz;
+	 bool inside;
+	 for (int i = 0; i<numCells; i++)  
+	 {
+		glBegin(GL_TRIANGLE_STRIP);
+		for (int j = 0; j < numCells; j++)
+		{
+			ux.push_back(mesh[other][index(i, j)].u[0]);
+			uy.push_back(mesh[other][index(i, j)].u[1]);
+			mod.push_back(sqrt(ux.back()*ux.back() + uy.back()*uy.back()));
+			if (vis[2])	 //Colours by velocity
+			{
+				
+				inside = colourScale.PickColour(mod.back(), &colourx, &coloury, &colourz);
+			}
+			else	//Colours by cell tag
+			{
+				inside = colourScale.PickColour((double)mesh[other][index(i,j)].tag , &colourx, &coloury, &colourz);
+			}
+			if (!inside)
+			{
+				colourx = 0.0; coloury = 0.0; colourz = 0.0;
+			}
+			glColor3f(colourx, coloury, colourz);
+			glVertex2f(j, i + psize);
+			glVertex2f(j, i);
+			//glVertex2f(j*psize, i*psize);
 
-	glutSwapBuffers();
+		}
+		glEnd();
+	 }
+	 //glEnd();
+	 
+	 
+	 //Draw velocity lines
+	 if (vis[0])    
+	 {
+		 glBegin(GL_LINES);
+		 glColor3f(0., 0.0, 0.);
+		 for (int i = 0; i < numCells; i++)
+		 {
+			 for (int j = 0; j < numCells; j++)
+			 {
+				 glVertex2f(j * psize, i * psize);
+				 glVertex2f(j * psize + (ux[index(i, j)] * psize) / mod[index(i, j)], i * psize + (uy[index(i, j)] * psize) / mod[index(i, j)]);
+			 }
+		 }
+		 glEnd();
+	 }
+
+	 glPopMatrix();
+
+	 //Draw colour scale 
+	 glPushMatrix();
+	 glTranslatef(0.9*win_width, 0., 0.);
+	 glScalef(0.1*win_width, win_height, 1.);
+	 colourScale.DrawScale(title);
+	 glPopMatrix();
+
+	 //Draw time counter
+	 std::ostringstream strs;
+	 strs << std::setprecision(2) << t*dt << "s";
+	 std::string time = strs.str();
+	 glColor3f(1., 1., 1.);
+	 colourScale.DrawText<std::string>(GLUT_BITMAP_HELVETICA_18, 0.9*win_width, 0.96*win_height, &time);
+
+	 glutSwapBuffers();
 }
 
 LBMSolver::~LBMSolver()
@@ -211,8 +267,5 @@ LBMSolver::~LBMSolver()
 		delete mesh;
 	}
 	
-
-	//std::cout << "deleting mesh " << std::endl;
-
 	//DELETE ALSO THE VECTOR SAVED
 }

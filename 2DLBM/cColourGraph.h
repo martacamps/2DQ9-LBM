@@ -4,16 +4,17 @@
 class cColourGraph
 {
 public:
-	//Just the 5 colours I know for the moment. 
-	cColourGraph(std::vector<double>* intervals, std::vector<double>* colours, int numColours);
 	cColourGraph();
 	~cColourGraph();
 
-	//void setIntervals(double* intervals) { m_intervals = intervals; }
-	void drawScale(std::string name);
-	void drawScale(std::string name, std::string* intervalNames);
+	void SetIntervals(std::vector<double> *intervals) { m_intervals = *intervals; }
+	void SetColours(std::vector<double> *colours, int numColours);
 
-	bool pickColour(double value, double *colourx, double* coloury, double* colourz);
+	void DrawScale(std::string name);
+	void DrawScale(std::string name, std::vector<std::string>* intervalNames, float posx, float posy, float sizex, float sizey, float psize);
+	template <class T> void DrawText(GLvoid *fontStyle, float posx, float posy, T *text);
+
+	bool PickColour(double value, double *colourx, double* coloury, double* colourz);
 
 private:
 	std::vector<double> m_colours;          //First RGB colour for each interval

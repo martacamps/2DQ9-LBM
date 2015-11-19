@@ -1,7 +1,9 @@
 #pragma once
 
-#define GAME_WIDTH	1000
-#define GAME_HEIGHT 1000
+#define GAME_WIDTH	880
+#define GAME_HEIGHT 800
+
+#include "cColourGraph.h"
 
 
 class cSolver
@@ -12,7 +14,7 @@ public:
 
 	//Create();
 	//Initialize();
-	virtual bool Input();
+	virtual void Input();
 	void Init(int i_renderStep);
 	bool Loop();
 	void Finalize();
@@ -33,7 +35,10 @@ public:
 protected:
 	int numSteps, renderStep;
 	unsigned char keys[256];
-	int t;             //Number of loops performed by the program
+	int t;                            //Number of loops performed by the program
+	std::vector<bool> vis;            //Visualization types
+	int state;                       //State of the simulation: running, paused or exit. 
+	cColourGraph colourScale;        //Current colour scale
 
 	 
 	

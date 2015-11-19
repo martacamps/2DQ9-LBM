@@ -3,7 +3,7 @@
 
 
 
-cSolver::cSolver() : t(0)
+cSolver::cSolver() : t(0), vis(1), state(1)
 {
 }
 
@@ -21,6 +21,10 @@ void cSolver::Init(int i_renderStep)
 	glOrtho(0, GAME_WIDTH, 0, GAME_HEIGHT, 0, 1);
 	glMatrixMode(GL_MODELVIEW);
 
+	//3 visualization options
+	vis.back() = true;
+	for (int i = 0; i < 3; i++)
+		vis.push_back(true);
 
 	//Solver initialization
 	renderStep = i_renderStep;
@@ -28,16 +32,32 @@ void cSolver::Init(int i_renderStep)
 	//Initialize();
 }
 
-bool cSolver::Input()
+void cSolver::Input()
 {
-	bool res = true;
+	if (keys[27])      //ESC to exit
+		state = 0;
+	if (keys[32])      //SPACE to pause simulation
+	{
+ 		state = -state;
+		keys[32] = 0;
+	}
+	if (keys[49])      //Activate / deactivate visualization mode 1
+	{
+		vis[0] = !vis[0];
+		keys[49] = 0;
+	}
+	if (keys[50])      //Activate / deactivate visualization mode 2
+	{
+		vis[1] = !vis[1];
+		keys[50] = 0;
+	}
+	if (keys[51])      //Activate / deactivate visualization mode 3 
+	{
+		vis[2] = !vis[2];
+		keys[51] = 0;
+	}
 
-	if (keys[27])
-		res = false;
-	//if(keys[ESPAI]) , PAUSA LA SIMULACIO ....
-	//if(keys[1], 2, 3, 4... cambiar el mode de visualització . Per exemple 1 pot ser contorns de velocitat i 2 pot ser vectors de velocitat. 
 
-	return res;
 }
 
 bool cSolver::Loop()
@@ -45,22 +65,48 @@ bool cSolver::Loop()
 	bool res = true;
 
 	//Process input
-	res = Input();
-	
-	//Simulation loop
-	if (t <= numSteps)
+	Input();
+	switch (state)
 	{
-		TimeStep(t);
-		if (t%renderStep == 0)
+	case 0:
+		return false;
+		break;
+	case 1:
+		//Simulation loop
+		if (t <= numSteps)
 		{
-			Render();
-			Save();
+			TimeStep(t);
+			if (t%renderStep == 0)
+			{
+				Render();
+				Save();
+			}
 		}
-	}
-	else
-		Render();     //FOR THE MOMENT I WILL JUST CONTINUOUSLY RENDER THE LAST IMAGE WHEN THE SIMULATION FINISHES. 
+		else
+			Render();     //CONTINUOUSLY RENDER THE LAST IMAGE WHEN THE SIMULATION FINISHES. 
+		t++;
+		break;
+	case -1:
+		//Show pause menu
+		float win_width = glutGet(GLUT_WINDOW_WIDTH);
+		float win_height = glutGet(GLUT_WINDOW_HEIGHT);
 
-	t++;
+	    //glClear(GL_COLOR_BUFFER_BIT);
+		glLoadIdentity();
+		glColor3f(1., 1., 1.);
+		std::string text("[SPACE BAR] Continue simulation");
+		colourScale.DrawText<std::string>(GLUT_BITMAP_HELVETICA_18, 0.1*win_width, 0.8*win_height, &text);
+		text = "[1] Hide /show velocity lines";
+		colourScale.DrawText<std::string>(GLUT_BITMAP_HELVETICA_18, 0.1*win_width, 0.7*win_height, &text);
+		text = "[2] Change between colour scale 1 and 2";
+		colourScale.DrawText<std::string>(GLUT_BITMAP_HELVETICA_18, 0.1*win_width, 0.6*win_height, &text);
+		text = "[3] Change between velocity and cell tag view";
+		colourScale.DrawText<std::string>(GLUT_BITMAP_HELVETICA_18, 0.1*win_width, 0.5*win_height, &text);
+		text = "[ESC] Exit program";
+		colourScale.DrawText<std::string>(GLUT_BITMAP_HELVETICA_18, 0.1*win_width, 0.4*win_height, &text);
+		glutSwapBuffers();
+		break;
+	}
 
 	return res;
 }

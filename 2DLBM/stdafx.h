@@ -14,6 +14,7 @@
 #include <exception>
 #include <iostream>
 #include <sstream>
+#include <iomanip>
 #include "glut.h"
 
 
