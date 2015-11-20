@@ -1,6 +1,25 @@
+//Copyright(c) 2015 Marta Camps Santasmasas
+//http://martacamps.weebly.com/
+//
+//This software is provided 'as-is', without any express or implied
+//warranty.In no event will the authors be held liable for any damages
+//arising from the use of this software.
+//
+//Permission is granted to anyone to use this software for any purpose,
+//including commercial applications, and to alter it and redistribute it
+//freely, subject to the following restrictions :
+//
+//1. The origin of this software must not be misrepresented; you must not
+//claim that you wrote the original software.If you use this software
+//in a product, an acknowledgement in the product documentation would be
+//appreciated but is not required.
+//2. Altered source versions must be plainly marked as such, and must not be
+//misrepresented as being the original software.
+//3. This notice may not be removed or altered from any source distribution.
+
 #include "stdafx.h"
 #include "LBMSolver.h"
-//#include "cColourGraph.h"
+
 
 LBMSolver::LBMSolver() :
 w({ { 4. / 9., 1. / 9., 1. / 9., 1. / 9., 1. / 9., 1. / 36., 1. / 36., 1. / 36., 1. / 36. } }),
@@ -19,7 +38,6 @@ void LBMSolver::Create(double nu, double sig, double v, double rho, double dx, d
 	lidSpeed = v;
 	
 	//Compute necessary information from input parameters
-	//dt = cellSize;
 	dt = sqrt((1e-4*cellSize) / 9.81);    // So the gravity acceleration in the model is not larger than 1e-4.
 	g = -9.81*(dt*dt) / cellSize;
 
@@ -37,8 +55,6 @@ void LBMSolver::Create(double nu, double sig, double v, double rho, double dx, d
 	numCells = (int)std::round(size / cellSize);
 	numSteps = (int)std::round(time / dt);
 
-	double Re = (lidSpeed*size) / nu;
-
 	//Create LBM mesh. 
 	mesh = new LBMCell*[2];
 	mesh[current] = new LBMCell[numCells*numCells];
@@ -46,9 +62,9 @@ void LBMSolver::Create(double nu, double sig, double v, double rho, double dx, d
 
 }
 
-void LBMSolver::InitialField()  //This can input the type of simulation or the initial field
+void LBMSolver::InitialField()  
 {
-	//Set the tags for the BC.
+	//Set the cell tags for the Boundary Conditions.
 	for (int j = 0; j < numCells; j++)
 	{
 		mesh[current][index(0, j)].tag = NOSLIPBC;
@@ -145,7 +161,6 @@ void LBMSolver::TimeStep(double t)
 	//Swap meshes
 	other = current;
 	current = 1 - other;
-	std::cout << t << std::endl;
 }
 
 void LBMSolver::Render()
@@ -187,7 +202,7 @@ void LBMSolver::Render()
 	 glPointSize(psize);
 	 glPushMatrix();
 	 glScalef((0.9*win_width) / (psize*numCells), win_height / (psize*numCells), 1.);
-	 //glBegin(GL_POINTS);
+	 glShadeModel(GL_FLAT);
 	 std::vector<double> ux, uy, mod;
 	 double colourx, coloury, colourz;
 	 bool inside;
@@ -201,7 +216,6 @@ void LBMSolver::Render()
 			mod.push_back(sqrt(ux.back()*ux.back() + uy.back()*uy.back()));
 			if (vis[2])	 //Colours by velocity
 			{
-				
 				inside = colourScale.PickColour(mod.back(), &colourx, &coloury, &colourz);
 			}
 			else	//Colours by cell tag
@@ -215,33 +229,35 @@ void LBMSolver::Render()
 			glColor3f(colourx, coloury, colourz);
 			glVertex2f(j, i + psize);
 			glVertex2f(j, i);
-			//glVertex2f(j*psize, i*psize);
+			glVertex2f(j+1, i + psize);
+			glVertex2f(j+1, i);
 
 		}
 		glEnd();
 	 }
-	 //glEnd();
 	 
 	 
-	 //Draw velocity lines
+	 //Draw cell velocity vectors
 	 if (vis[0])    
-	 {
-		 glBegin(GL_LINES);
-		 glColor3f(0., 0.0, 0.);
-		 for (int i = 0; i < numCells; i++)
-		 {
-			 for (int j = 0; j < numCells; j++)
-			 {
-				 glVertex2f(j * psize, i * psize);
-				 glVertex2f(j * psize + (ux[index(i, j)] * psize) / mod[index(i, j)], i * psize + (uy[index(i, j)] * psize) / mod[index(i, j)]);
-			 }
-		 }
-		 glEnd();
+	 { 
+		glColor3f(0., 0.0, 0.);
+		for (int i = 0; i < numCells; i++)
+		{
+			for (int j = 0; j < numCells; j++)
+			{
+				glBegin(GL_LINE_STRIP);
+					glVertex2f(1+j, 0.5+i);
+					glVertex2f(1+j + ux[index(i, j)] / mod[index(i, j)], 0.5+i+ uy[index(i, j)] / mod[index(i, j)]);
+					glVertex2f(0.8 + j + ux[index(i, j)] / mod[index(i, j)], 0.8 + i + uy[index(i, j)] / mod[index(i, j)]);   //Arrow head
+				glEnd();
+			}
+		} 
 	 }
 
 	 glPopMatrix();
 
 	 //Draw colour scale 
+	 glShadeModel(GL_SMOOTH);
 	 glPushMatrix();
 	 glTranslatef(0.9*win_width, 0., 0.);
 	 glScalef(0.1*win_width, win_height, 1.);
@@ -266,6 +282,5 @@ LBMSolver::~LBMSolver()
 		delete mesh[1];
 		delete mesh;
 	}
-	
-	//DELETE ALSO THE VECTOR SAVED
+
 }
