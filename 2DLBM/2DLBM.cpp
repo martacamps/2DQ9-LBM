@@ -125,6 +125,7 @@ int main(int argc, char* argv[])
 			break;
 		case 4:
 			cavity.Create(1e-6, 7e-4, 0.4, 1000, 0.000006, 0.001, 150);   //Re 400 fine
+			//cavity.Create(1e-6, 7e-4, 0.4, 1000, 0.000004, 0.001, 150);   //Re 400 fine
 			break;
 		default:
 			double nu, v, dx, size, time;

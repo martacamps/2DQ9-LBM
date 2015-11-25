@@ -39,7 +39,10 @@ void LBMSolver::Create(double nu, double sig, double v, double rho, double dx, d
 	
 	//Compute necessary information from input parameters
 	dt = sqrt((1e-4*cellSize) / 9.81);    // So the gravity acceleration in the model is not larger than 1e-4.
-	g = -9.81*(dt*dt) / cellSize;
+	dt = 0.8*cellSize;
+	//g = -9.81*(dt*dt) / cellSize;
+	g = 0.0;
+	c = (cellSize/2.) / dt;
 
 	double nuStar = nu*(dt / (cellSize*cellSize));
 	tau = (6 * nuStar + 1) / 2;
@@ -59,6 +62,8 @@ void LBMSolver::Create(double nu, double sig, double v, double rho, double dx, d
 	mesh = new LBMCell*[2];
 	mesh[current] = new LBMCell[numCells*numCells];
 	mesh[other] = new LBMCell[numCells*numCells];
+
+	file.open("save.txt");
 
 }
 
@@ -118,7 +123,7 @@ void LBMSolver::TimeStep(double t)
 			double rho = 0.0, ux = 0.0, uy = 0.0;
 			if (mesh[current][ij].BC == FIXEDV)         //Fix the density and velocity for the cells marked as FIXEDV (the lid cells)
 			{
-				rho = 1.; ux = lidSpeed; uy = 0.0;
+				rho = 1.; ux = lidSpeed*c; uy = 0.0;
 			}
 			else                                       //calculate density and velocity 
 			{
@@ -130,8 +135,8 @@ void LBMSolver::TimeStep(double t)
 					ux += fi*ex[l];
 					uy += fi*ey[l];
 				}
-				ux = ux / rho;
-				uy = uy / rho;
+				ux = (ux*c)/rho;
+				uy = (uy*c)/rho;
 			}
 			mesh[current][ij].rho = rho;
 			mesh[current][ij].u[0] = ux;
@@ -140,27 +145,31 @@ void LBMSolver::TimeStep(double t)
 			//Collision: apply gravity
 			if (mesh[current][ij].BC != FIXEDV)
 			{
-				uy += tau*g;
+				uy += tau*g*c/rho;
 			}
 		
 			//Collision
 			for (int l = 0; l < finv.size(); l++)
 			{
 				double eDotu = ex[l] * ux + ey[l] * uy;
-				double f0 = w[l] *rho*(1 - (3.*(ux*ux + uy*uy)) / 2. + (3.*eDotu)  + (9.*eDotu*eDotu) / 2.);  
+				double f0 = w[l] *rho*(1 - (3.*(ux*ux + uy*uy)) / (2.*c*c) + (3.*eDotu)/c  + (9.*eDotu*eDotu) / (2.*c*c));  
+				//double f0 = w[l] * rho*(1 - (3.*(ux*ux + uy*uy)) / (2.*c*c) + (3.*eDotu) / (c*c) + (9.*eDotu*eDotu) / (2.*c*c));
 				mesh[current][ij].f[l] = mesh[current][ij].f[l] - (1 / tau)*(mesh[current][ij].f[l] - f0);
 			}
 
 			//Collision: Calculate velocities for display and particle tracing. 
 			if (mesh[current][ij].BC != FIXEDV)
 			{
-				mesh[current][ij].u[1] += 0.5*tau*g;
+				mesh[current][ij].u[1] += 0.5*tau*g*c/rho;
+				//mesh[current][ij].u[1] += 0.5*tau*g;
 			}
 		}
 	}
 	//Swap meshes
 	other = current;
 	current = 1 - other;
+
+	std::cout << t << std::endl;
 }
 
 void LBMSolver::Render()
@@ -211,8 +220,8 @@ void LBMSolver::Render()
 		glBegin(GL_TRIANGLE_STRIP);
 		for (int j = 0; j < numCells; j++)
 		{
-			ux.push_back(mesh[other][index(i, j)].u[0]);
-			uy.push_back(mesh[other][index(i, j)].u[1]);
+			ux.push_back(mesh[other][index(i, j)].u[0]/c);
+			uy.push_back(mesh[other][index(i, j)].u[1]/c);
 			mod.push_back(sqrt(ux.back()*ux.back() + uy.back()*uy.back()));
 			if (vis[2])	 //Colours by velocity
 			{
@@ -272,6 +281,18 @@ void LBMSolver::Render()
 	 colourScale.DrawText<std::string>(GLUT_BITMAP_HELVETICA_18, 0.9*win_width, 0.96*win_height, &time);
 
 	 glutSwapBuffers();
+
+
+
+
+	 int j = numCells / 2;
+	 float size = numCells*cellSize;
+	 file << t << std::endl;
+	 for (int i = 0; i < numCells; i++)
+	 {
+		 file << (j*cellSize)/size << " " << (i*cellSize)/size << " " << ux[index(i, j)]/lidSpeed << std::endl;
+	 }
+	 file << std::endl;
 }
 
 LBMSolver::~LBMSolver()
@@ -283,4 +304,6 @@ LBMSolver::~LBMSolver()
 		delete mesh;
 	}
 
+
+	file.close();
 }

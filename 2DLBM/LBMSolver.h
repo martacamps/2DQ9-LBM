@@ -41,8 +41,12 @@ public:
 	void Render();            
 	~LBMSolver();
 
+
+	std::ofstream file;
+
 private:
 	double tau;							//relaxation time
+	double c;							//lattice speed
 	double sigma;						//surface tension parameter
 	double cellSize;	                //cell Size in meters
 	int numCells;						//number of cells in each direction
