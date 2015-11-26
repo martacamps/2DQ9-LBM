@@ -41,9 +41,6 @@ public:
 	void Render();            
 	~LBMSolver();
 
-
-	std::ofstream file;
-
 private:
 	double tau;							//relaxation time
 	double c;							//lattice speed
