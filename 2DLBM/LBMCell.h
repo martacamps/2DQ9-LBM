@@ -40,7 +40,7 @@ struct LBMCell
 	double rho = 1;            //cell density
 	std::array<double, 2> u;   //cell velocity
 	std::array<double, 9> f;   //particle distribution functions
-	cellTag tag = fluid;       //cell type
+	cellTag tag = gas;       //cell type
 	int BC = INTERNAL;         //FIXEDV if the cell velocity is fixed
 	bool newInterface = false; //true if the cell will change to a interface cell in the next step
 

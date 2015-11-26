@@ -70,6 +70,9 @@ void LBMSolver::Create(double nu, double sig, double fx, double fy, double rho, 
 
 void LBMSolver::InitialField()  
 {
+	int fsizex = numCells / 3;
+	int fsizey = 3 * numCells / 4;
+
 	//Set the cell tags for the Boundary Conditions.
 	for (int j = 0; j < numCells; j++)
 	{
@@ -81,11 +84,32 @@ void LBMSolver::InitialField()
 	}
 	for (int i = 1; i < (numCells - 1); i++)
 	{
-
 		mesh[current][index(i, 0)].tag = noslipbc;
 		mesh[current][index(i, numCells - 1)].tag = noslipbc;
+
 		mesh[other][index(i, 0)].tag = noslipbc;
 		mesh[other][index(i, numCells - 1)].tag = noslipbc;
+	}
+
+	//Set the initial position of the fluid, gas and interface cells. 
+	for (int i = 1; i < fsizey; i++)
+	{
+		for (int j = 1; j < fsizex; j++)
+		{
+			mesh[current][index(i, j)].tag = fluid;
+			mesh[other][index(i, j)].tag = fluid;
+		}
+		mesh[current][index(i, fsizex)].tag = interface;
+		mesh[current][index(i, fsizex)].mass = 0.5;
+		mesh[other][index(i, fsizex)].tag = interface;
+		mesh[other][index(i, fsizex)].mass = 0.5;
+	}
+	for (int j = 1; j <= fsizex; j++)
+	{
+		mesh[current][index(fsizey, j)].tag = interface;
+		mesh[current][index(fsizey, j)].mass = 0.5;
+		mesh[other][index(fsizey, j)].tag = interface;
+		mesh[other][index(fsizey, j)].mass = 0.5;
 	}
 }
 
