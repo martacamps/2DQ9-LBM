@@ -32,7 +32,7 @@ public:
 	LBMSolver();
 
 	//Input the solver parameters and prepare the solver to start
-	void Create(double nu, double sig, double dum, double rho, double dx, double size, double time);
+	void Create(double nu, double sig, double fx, double fy, double rho, double dx, double size, double time);
 	//Set the initial conditions for a lid driven cavity flow
 	void InitialField();       
 	//2DQ9 LBM time step
@@ -48,11 +48,10 @@ private:
 	double cellSize;	                //cell Size in meters
 	int numCells;						//number of cells in each direction
 	double dt;                          //lenght of each time step in seconds
-	double lidSpeed;                    //Horizontal Speed of the lid
-	double g;							//acceleration of gravity
 	int current, other;					//To differenciate between the current mesh and the auxiliar mesh
 	LBMCell **mesh;                     //LBM mesh
 	int index(int i, int j) { return i*numCells + j; }  //To access the mesh array as it was a 2D matrix.
+	std::array<double, 2> g;			//acceleration of gravity
 	const std::array<double, 9> w;		//Weights
 	const std::array<int, 9> ex;        //x components of the velocity vectors
 	const std::array<int, 9> ey;        //y components of the velocity vectors

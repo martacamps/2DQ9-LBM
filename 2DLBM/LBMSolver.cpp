@@ -32,14 +32,19 @@ other(1)
 
 }
 
-void LBMSolver::Create(double nu, double sig, double v, double rho, double dx, double size, double time)
+void LBMSolver::Create(double nu, double sig, double fx, double fy, double rho, double dx, double size, double time)
 {
 	cellSize = dx;
-	lidSpeed = v;
+	//lidSpeed = v;
 	
 	//Compute necessary information from input parameters
-	dt = sqrt((1e-4*cellSize) / 9.81);    // So the gravity acceleration in the model is not larger than 1e-4.
-	g = -9.81*(dt*dt) / cellSize;
+	double gMag = sqrt(fx*fx + fy*fy);
+	if (gMag > 0)
+		dt = sqrt((1e-4*cellSize) / sqrt(fx*fx + fy*fy));    // So the gravity acceleration in the model is not larger than 1e-4.
+	else
+		dt = cellSize;
+	g[0] = fx*(dt*dt) / cellSize;
+	g[1] = fy*(dt*dt) / cellSize;
 	c = cellSize/dt;
 
 	double nuStar = nu*(dt / (cellSize*cellSize));
@@ -82,11 +87,6 @@ void LBMSolver::InitialField()
 		mesh[other][index(i, 0)].tag = noslipbc;
 		mesh[other][index(i, numCells - 1)].tag = noslipbc;
 	}
-	for (int j = 1; j < (numCells - 1); j++)
-	{
-		mesh[current][index(numCells - 2, j)].BC = FIXEDV;
-		mesh[other][index(numCells - 2, j)].BC = FIXEDV;
-	}
 }
 
 void LBMSolver::TimeStep(double t)
@@ -115,34 +115,26 @@ void LBMSolver::TimeStep(double t)
 				}     
 			}
 
-			//Collision
+			//Collision: calculate cell density and velocity
 			double rho = 0.0, ux = 0.0, uy = 0.0;
-			if (mesh[current][ij].BC == FIXEDV)         //Fix the density and velocity for the cells marked as FIXEDV (the lid cells)
+			double fi;
+			for (int l = 0; l < finv.size(); l++)
 			{
-				rho = 1.; ux = lidSpeed; uy = 0.0;
+				fi = mesh[current][ij].f[l];
+				rho += fi;
+				ux += fi*ex[l];
+				uy += fi*ey[l];
 			}
-			else                                       //calculate density and velocity 
-			{
-				double fi;
-				for (int l = 0; l < finv.size(); l++)
-				{
-					fi = mesh[current][ij].f[l];
-					rho += fi;
-					ux += fi*ex[l];
-					uy += fi*ey[l];
-				}
-				ux = (ux*c)/rho;
-				uy = (uy*c)/rho;
-			}
+			ux = (ux*c)/rho;
+			uy = (uy*c)/rho;
+			//}
 			mesh[current][ij].rho = rho;
 			mesh[current][ij].u[0] = ux;
 			mesh[current][ij].u[1] = uy;
 
 			//Collision: apply gravity
-			if (mesh[current][ij].BC != FIXEDV)
-			{
-				uy += tau*g;
-			}
+			ux += tau*g[0];
+			uy += tau*g[1];
 		
 			//Collision
 			for (int l = 0; l < finv.size(); l++)
@@ -153,15 +145,14 @@ void LBMSolver::TimeStep(double t)
 			}
 
 			//Collision: Calculate velocities for display and particle tracing. 
-			if (mesh[current][ij].BC != FIXEDV)
-			{
-				mesh[current][ij].u[1] += 0.5*tau*g;
-			}
+			mesh[current][ij].u[0] += 0.5*tau*g[0];
+			mesh[current][ij].u[1] += 0.5*tau*g[1];
 		}
 	}
 	//Swap meshes
 	other = current;
 	current = 1 - other;
+	std::cout << t << std::endl;
 }
 
 void LBMSolver::Render()
@@ -177,8 +168,9 @@ void LBMSolver::Render()
 	std::string title;
 	if (vis[2])  //Colours by velocity
 	{
+		double maxSpeed = 0.1;
 		for (int i = 0; i < 6; i++)
-			intervals.push_back(i*lidSpeed / 5.0);
+			intervals.push_back(i*maxSpeed / 5.0);
 		colourScale.SetIntervals(&intervals);
 
 		if (vis[1])   //Colour pallette 1
@@ -191,10 +183,10 @@ void LBMSolver::Render()
 	}
 	else       //Colours by cell tag
 	{
-		intervals = { fluid, noslipbc };
+		intervals = { fluid, gas, interface, ifull, iempty, slipbc, noslipbc };
 		colourScale.SetIntervals(&intervals);
-		colours = { 0.2, 0.6, 1.0, 0.4, 0.2, 0. };   //light blue, brown.
-		colourScale.SetColours(&colours, 2);
+		colours = { 0.2, 0.6, 1.0,   1., 1., 1.,    0.,0.,0.8,  1.0,0.,0.,    0.,1.,0.,   0.4,0.5,0.6,     0.4, 0.2, 0. };   //light blue, white, dark blue, red, green, grey, brown.
+		colourScale.SetColours(&colours, 7);
 		title = "cell type";
 	}
 
@@ -212,17 +204,8 @@ void LBMSolver::Render()
 		glBegin(GL_TRIANGLE_STRIP);
 		for (int j = 0; j < numCells; j++)
 		{
-			//Extract velocity. The velocity has not to be divided by c for the lid. 
-			if (mesh[other][index(i, j)].BC == FIXEDV)
-			{
-				ux.push_back(mesh[other][index(i, j)].u[0]);
-				uy.push_back(mesh[other][index(i, j)].u[1]);
-			}
-			else
-			{
-				ux.push_back(mesh[other][index(i, j)].u[0] / c);
-				uy.push_back(mesh[other][index(i, j)].u[1] / c);
-			}
+			ux.push_back(mesh[other][index(i, j)].u[0] / c);
+			uy.push_back(mesh[other][index(i, j)].u[1] / c);
 			mod.push_back(sqrt(ux.back()*ux.back() + uy.back()*uy.back()));
 			if (vis[2])	 //Colours by velocity
 			{

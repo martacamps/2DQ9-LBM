@@ -69,10 +69,10 @@ int main(int argc, char* argv[])
 			} while (std::stoi(line) <= 0);
 			printSteps = stoi(line);
 			std::cout << "Simulation settings: " << std::endl;
-			std::cout << "   1: Simulation with Reynolds number = 250" << std::endl;
-			std::cout << "   2: Simulation with Reynolds number = 100 low resolution" << std::endl;
-			std::cout << "   3: Simulation with Reynolds number = 100 high resolution" << std::endl;
-			std::cout << "   4: Simulation with Reynolds number = 400" << std::endl;
+			std::cout << "   1: Previous Reynolds number = 250. Normal gravity" << std::endl;
+			std::cout << "   2: Previous Reynolds number = 100 low resolution. Gravity in +x" << std::endl;
+			std::cout << "   3: Previous Reynolds number = 100 high resolution. Gravity in +x -y" << std::endl;
+			std::cout << "   Previous Reynolds number = 400. No gravity" << std::endl;
 			std::cout << "   Any other number: Manually input the simulation settings. " << std::endl;
 			std::cout << std::endl;
 		    std::cout << "  (WARNING: The simulation may crash or show unrealistic results depending on the manually input settings.)" << std::endl;
@@ -115,25 +115,28 @@ int main(int argc, char* argv[])
 		switch (testCase)
 		{
 		case 1:
-			cavity.Create(1e-6, 7e-4, 0.5, 1000, 0.000006, 0.0005, 150);   //Re 250 
+			cavity.Create(1e-6, 7e-4, 0, -9.81, 1000, 0.000006, 0.0005, 150);   //Re 250 
 			break;
 		case 2:
-			cavity.Create(1e-6, 7e-4, 1.0, 1000, 0.000005, 0.0001, 150);   //Re 100 coarse
+			cavity.Create(1e-6, 7e-4, -9.81,0, 1000, 0.000005, 0.0001, 150);   //Re 100 coarse
 			break;
 		case 3:
-			cavity.Create(1e-6, 7e-4, 0.25, 1000, 0.000004, 0.0004, 150);   //Re 100 fine
+			cavity.Create(1e-6, 7e-4, 4.5, -4.5, 1000, 0.000004, 0.0004, 150);   //Re 100 fine
 			break;
 		case 4:
-			cavity.Create(1e-6, 7e-4, 0.4, 1000, 0.000006, 0.001, 150);   //Re 400 fine
+			cavity.Create(1e-6, 7e-4, 0, 0, 1000, 0.000006, 0.001, 150);   //Re 400 fine
 			break;
 		default:
-			double nu, v, dx, size, time;
+			double nu, fx, fy, dx, size, time;
 			std::cout << "Set fluid's kinematic viscosity [m2/s]:" << std::endl;
 			std::cin >> line;
 			nu = std::stod(line);
-			std::cout << "Set the speed of the lid [m/s]:" << std::endl;
+			std::cout << "Set the x component of gravity [m/s]:" << std::endl;
 			std::cin >> line;
-			v = std::stod(line);
+			fx = std::stod(line);
+			std::cout << "Set the y component of gravity [m/s]:" << std::endl;
+			std::cin >> line;
+			fy = std::stod(line);
 			std::cout << "Set the cell size [m]:" << std::endl;
 			std::cin >> line;
 			dx = std::stod(line);
@@ -143,7 +146,7 @@ int main(int argc, char* argv[])
 			std::cout << "Set the amount of time to simulate [s]:" << std::endl;
 			std::cin >> line;
 			time = std::stod(line);
-			cavity.Create(nu, 7e-4, v, 1000, dx, size, time);              //User defined
+			cavity.Create(nu, 7e-4, fx, fy, 1000, dx, size, time);              //User defined
 			break;
 		}
 	
