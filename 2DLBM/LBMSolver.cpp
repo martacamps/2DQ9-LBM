@@ -68,19 +68,19 @@ void LBMSolver::InitialField()
 	//Set the cell tags for the Boundary Conditions.
 	for (int j = 0; j < numCells; j++)
 	{
-		mesh[current][index(0, j)].tag = NOSLIPBC;
-		mesh[current][index(numCells - 1, j)].tag = NOSLIPBC;
+		mesh[current][index(0, j)].tag = noslipbc;
+		mesh[current][index(numCells - 1, j)].tag = noslipbc;
 		
-		mesh[other][index(0, j)].tag = NOSLIPBC;
-		mesh[other][index(numCells - 1, j)].tag = NOSLIPBC;
+		mesh[other][index(0, j)].tag = noslipbc;
+		mesh[other][index(numCells - 1, j)].tag = noslipbc;
 	}
 	for (int i = 1; i < (numCells - 1); i++)
 	{
 
-		mesh[current][index(i, 0)].tag = NOSLIPBC;
-		mesh[current][index(i, numCells - 1)].tag = NOSLIPBC;
-		mesh[other][index(i, 0)].tag = NOSLIPBC;
-		mesh[other][index(i, numCells - 1)].tag = NOSLIPBC;
+		mesh[current][index(i, 0)].tag = noslipbc;
+		mesh[current][index(i, numCells - 1)].tag = noslipbc;
+		mesh[other][index(i, 0)].tag = noslipbc;
+		mesh[other][index(i, numCells - 1)].tag = noslipbc;
 	}
 	for (int j = 1; j < (numCells - 1); j++)
 	{
@@ -105,7 +105,7 @@ void LBMSolver::TimeStep(double t)
 				int previous = index(i + ey[inv], j + ex[inv]);
 
 				//check the type of the neighbour cell and perform streaming
-				if (mesh[other][previous].tag == NOSLIPBC)  //The neighbour cell is a non slip wall
+				if (mesh[other][previous].tag == noslipbc)  //The neighbour cell is a non slip wall
 				{
 					mesh[current][ij].f[l] = mesh[current][ij].f[inv];
 				}
@@ -191,7 +191,7 @@ void LBMSolver::Render()
 	}
 	else       //Colours by cell tag
 	{
-		intervals = { FLUID, NOSLIPBC };
+		intervals = { fluid, noslipbc };
 		colourScale.SetIntervals(&intervals);
 		colours = { 0.2, 0.6, 1.0, 0.4, 0.2, 0. };   //light blue, brown.
 		colourScale.SetColours(&colours, 2);

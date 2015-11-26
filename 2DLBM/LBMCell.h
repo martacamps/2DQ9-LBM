@@ -29,13 +29,18 @@
 #define FIXEDV 7
 #define INTERNAL 8
 
+enum cellTag
+{
+	fluid, gas, interface, ifull, iempty, slipbc, noslipbc
+};
+
 struct LBMCell
 {
 	double mass = 1;           //cell mass
 	double rho = 1;            //cell density
 	std::array<double, 2> u;   //cell velocity
 	std::array<double, 9> f;   //particle distribution functions
-	int tag = FLUID;           //cell type
+	cellTag tag = fluid;       //cell type
 	int BC = INTERNAL;         //FIXEDV if the cell velocity is fixed
 	bool newInterface = false; //true if the cell will change to a interface cell in the next step
 
