@@ -39,10 +39,8 @@ void LBMSolver::Create(double nu, double sig, double v, double rho, double dx, d
 	
 	//Compute necessary information from input parameters
 	dt = sqrt((1e-4*cellSize) / 9.81);    // So the gravity acceleration in the model is not larger than 1e-4.
-	dt = 0.8*cellSize;
-	//g = -9.81*(dt*dt) / cellSize;
-	g = 0.0;
-	c = (cellSize/2.) / dt;
+	g = -9.81*(dt*dt) / cellSize;
+	c = cellSize/dt;
 
 	double nuStar = nu*(dt / (cellSize*cellSize));
 	tau = (6 * nuStar + 1) / 2;
@@ -123,7 +121,7 @@ void LBMSolver::TimeStep(double t)
 			double rho = 0.0, ux = 0.0, uy = 0.0;
 			if (mesh[current][ij].BC == FIXEDV)         //Fix the density and velocity for the cells marked as FIXEDV (the lid cells)
 			{
-				rho = 1.; ux = lidSpeed*c; uy = 0.0;
+				rho = 1.; ux = lidSpeed; uy = 0.0;
 			}
 			else                                       //calculate density and velocity 
 			{
@@ -145,7 +143,7 @@ void LBMSolver::TimeStep(double t)
 			//Collision: apply gravity
 			if (mesh[current][ij].BC != FIXEDV)
 			{
-				uy += tau*g*c/rho;
+				uy += tau*g;
 			}
 		
 			//Collision
@@ -153,15 +151,13 @@ void LBMSolver::TimeStep(double t)
 			{
 				double eDotu = ex[l] * ux + ey[l] * uy;
 				double f0 = w[l] *rho*(1 - (3.*(ux*ux + uy*uy)) / (2.*c*c) + (3.*eDotu)/c  + (9.*eDotu*eDotu) / (2.*c*c));  
-				//double f0 = w[l] * rho*(1 - (3.*(ux*ux + uy*uy)) / (2.*c*c) + (3.*eDotu) / (c*c) + (9.*eDotu*eDotu) / (2.*c*c));
 				mesh[current][ij].f[l] = mesh[current][ij].f[l] - (1 / tau)*(mesh[current][ij].f[l] - f0);
 			}
 
 			//Collision: Calculate velocities for display and particle tracing. 
 			if (mesh[current][ij].BC != FIXEDV)
 			{
-				mesh[current][ij].u[1] += 0.5*tau*g*c/rho;
-				//mesh[current][ij].u[1] += 0.5*tau*g;
+				mesh[current][ij].u[1] += 0.5*tau*g;
 			}
 		}
 	}
@@ -220,8 +216,17 @@ void LBMSolver::Render()
 		glBegin(GL_TRIANGLE_STRIP);
 		for (int j = 0; j < numCells; j++)
 		{
-			ux.push_back(mesh[other][index(i, j)].u[0]/c);
-			uy.push_back(mesh[other][index(i, j)].u[1]/c);
+			//Extract velocity. The velocity has not to be divided by c for the lid. 
+			if (mesh[other][index(i, j)].BC == FIXEDV)
+			{
+				ux.push_back(mesh[other][index(i, j)].u[0]);
+				uy.push_back(mesh[other][index(i, j)].u[1]);
+			}
+			else
+			{
+				ux.push_back(mesh[other][index(i, j)].u[0]/c);
+				uy.push_back(mesh[other][index(i, j)].u[1]/c );
+			}
 			mod.push_back(sqrt(ux.back()*ux.back() + uy.back()*uy.back()));
 			if (vis[2])	 //Colours by velocity
 			{
