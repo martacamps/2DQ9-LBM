@@ -44,6 +44,8 @@ void cSolver::Init(int i_renderStep)
 	vis.back() = true;
 	for (int i = 0; i < 3; i++)
 		vis.push_back(true);
+	//DEBUG THIIING!!!!!!!!!!!!!!!!!!!!!!!!!
+	vis[2] = false;
 
 	//Solver initialization
 	renderStep = i_renderStep;

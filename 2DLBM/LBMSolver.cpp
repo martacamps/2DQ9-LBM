@@ -101,6 +101,7 @@ void LBMSolver::InitialField()
 		}
 		mesh[current][index(i, fsizex)].tag = interface;
 		mesh[current][index(i, fsizex)].mass = 0.5;
+		interfaceCells.push_back(index(i, fsizex));
 		mesh[other][index(i, fsizex)].tag = interface;
 		mesh[other][index(i, fsizex)].mass = 0.5;
 	}
@@ -108,6 +109,7 @@ void LBMSolver::InitialField()
 	{
 		mesh[current][index(fsizey, j)].tag = interface;
 		mesh[current][index(fsizey, j)].mass = 0.5;
+		interfaceCells.push_back(index(fsizey, j));
 		mesh[other][index(fsizey, j)].tag = interface;
 		mesh[other][index(fsizey, j)].mass = 0.5;
 	}
@@ -115,68 +117,263 @@ void LBMSolver::InitialField()
 
 void LBMSolver::TimeStep(double t)
 {
-	
+	//TimeStep
+	double epsilon, nextEpsilon, f0, f0inv,tempMass;
+	int ue = 0;
 	for (int i = 1; i < numCells-1; i++)
 	{
 		for (int j = 1; j < numCells-1; j++)
 		{
 			int ij = index(i, j);
 
-			//Streaming. 
-			for (int l = 0; l < finv.size(); l++)
+			if (mesh[other][ij].tag != gas)
+			{
+
+				switch(mesh[other][ij].tag)
+				{
+				case fluid:
+					//Streaming. 
+					for (int l = 0; l < finv.size(); l++)
+					{
+						int inv = finv[l];
+						int previous = index(i + ey[inv], j + ex[inv]);
+
+						//check the type of the neighbour cell and perform streaming
+						if (mesh[other][previous].tag == noslipbc)  //The neighbour cell is a non slip wall
+						{
+							mesh[current][ij].f[l] = mesh[current][ij].f[inv];
+						}
+						else										//The neighbour cell is fluid
+						{
+							mesh[current][ij].f[l] = mesh[other][previous].f[l];
+						}
+					}
+					break;
+				case interface :
+					tempMass = 0.0;
+					//Streaming.
+					mesh[current][ij].f[0] = mesh[other][ij].f[0];  //Stream
+					for (int l = 1; l < finv.size(); l++)
+					{
+						int inv = finv[l];
+						int previous = index(i + ey[inv], j + ex[inv]);
+						int next = index(i + ey[l], j + ex[l]);
+
+						//check the type of the neighbour cell and perform streaming. //I COULD DO THIS WITH A FOREACH IF I PUT THE LINES OF CODE INTO A FUNCTION (MAYBE IT IS MORE EFFICIENT)
+						switch (mesh[other][previous].tag)
+						{
+						case fluid:
+							mesh[current][ij].f[l] = mesh[other][previous].f[l];  //Stream
+							//epsilon = mesh[other][ij].mass / mesh[other][ij].rho;  //Fill level of the current cell
+							//nextEpsilon = mesh[other][next].mass / mesh[other][next].rho;  // Fill level of the next cell
+							//mesh[current][ij].mass += nextEpsilon*mesh[other][next].f[inv] - epsilon*mesh[other][ij].f[l];   //Mass update. 
+							break;
+						case interface:   //THE SAME AS FLUID (I THINK) I CAN PUT THEM TOGETHER.
+							mesh[current][ij].f[l] = mesh[other][previous].f[l];  //Stream
+							//epsilon = mesh[other][ij].mass / mesh[other][ij].rho;  //Fill level of the current cell
+							//nextEpsilon = mesh[other][next].mass / mesh[other][next].rho;  // Fill level of the next cell
+							//mesh[current][ij].mass += nextEpsilon*mesh[other][next].f[inv] - epsilon*mesh[other][ij].f[l];   //Mass update.
+							break;
+						case gas:
+							f0inv = Fequi(mesh[other][ij].u[0], mesh[other][ij].u[1], 1.0, inv);
+							f0 = Fequi(mesh[other][ij].u[0], mesh[other][ij].u[1], 1.0, l);
+							mesh[current][ij].f[l] = f0inv + f0 - mesh[other][ij].f[l];    //Surface reconstruction. FALTA LA SURFACE TENSION I LA PRESSURE. 
+							break;
+						case noslipbc:    //The neighbour cell is a non slip wall
+							mesh[current][ij].f[l] = mesh[current][ij].f[inv];
+							break;
+						}
+
+						//Mass update
+						if (mesh[other][next].tag == interface || mesh[other][next].tag == fluid)
+						{
+							epsilon = mesh[other][ij].mass / mesh[other][ij].rho;  //Fill level of the current cell
+							nextEpsilon = mesh[other][next].mass / mesh[other][next].rho;  // Fill level of the next cell
+							tempMass += nextEpsilon*mesh[other][next].f[inv] - epsilon*mesh[other][ij].f[l];
+						}
+					}
+					mesh[current][ij].mass = mesh[other][ij].mass + tempMass;
+					break;
+				}
+
+				//Collision: calculate cell density and velocity
+				double rho = 0.0, ux = 0.0, uy = 0.0;
+				double fi;
+				for (int l = 0; l < finv.size(); l++)
+				{
+					fi = mesh[current][ij].f[l];
+					rho += fi;
+					ux += fi*ex[l];
+					uy += fi*ey[l];
+				}
+				ux = (ux*c) / rho;
+				uy = (uy*c) / rho;
+				//}
+				mesh[current][ij].rho = rho;
+				mesh[current][ij].u[0] = ux;
+				mesh[current][ij].u[1] = uy;
+
+				//Collision: apply gravity
+				ux += tau*g[0];
+				uy += tau*g[1];
+
+				//Collision
+				for (int l = 0; l < finv.size(); l++)
+				{
+					//double eDotu = ex[l] * ux + ey[l] * uy;
+					//double f0 = w[l] * rho*(1 - (3.*(ux*ux + uy*uy)) / (2.*c*c) + (3.*eDotu) / c + (9.*eDotu*eDotu) / (2.*c*c));
+					double f0 = Fequi(ux, uy, rho, l);
+					mesh[current][ij].f[l] = mesh[current][ij].f[l] - (1 / tau)*(mesh[current][ij].f[l] - f0);
+				}
+
+				//Collision: Calculate velocities for display and particle tracing. 
+				mesh[current][ij].u[0] += 0.5*tau*g[0];
+				mesh[current][ij].u[1] += 0.5*tau*g[1];
+			}
+		}
+	}
+
+	//Prepare time step: Mark the interface cells that are empty or full
+	std::list<int>::iterator it, sideIt;
+	for (it = interfaceCells.begin(); it != interfaceCells.end(); ++it)
+	{
+		if (mesh[current][*it].mass <= 0)
+		{
+			mesh[current][*it].tag = iempty;
+			mesh[other][*it].tag = iempty;
+		}
+			
+		if (mesh[current][*it].mass >= mesh[current][*it].rho)
+		{
+			mesh[current][*it].tag = ifull;
+			mesh[other][*it].tag = ifull;
+		}
+	}
+
+	//Prepare time step: Mass exchange 
+	//Done for the 'current' mesh. 
+	double excessMass = 0.0;
+	for (it = interfaceCells.begin(); it != interfaceCells.end(); ++it)
+	{
+		if (mesh[current][*it].tag != interface)
+		{
+			//Calculate the position of the cell to be able to search its neighbours. 
+			int i = *it / numCells;
+			int j = *it - numCells*i;
+			int tag = mesh[current][*it].tag;
+			std::list<int> sideInterfaces;
+
+			//Search its neighbours and count and change the surrounding cells to interface cells.
+			for (int l = 1; l < 9; l++)
 			{
 				int inv = finv[l];
 				int previous = index(i + ey[inv], j + ex[inv]);
 
-				//check the type of the neighbour cell and perform streaming
-				if (mesh[other][previous].tag == noslipbc)  //The neighbour cell is a non slip wall
+				switch (mesh[current][previous].tag)
 				{
-					mesh[current][ij].f[l] = mesh[current][ij].f[inv];
+				case interface :
+					sideInterfaces.push_back(previous);
+					break;
+				case fluid:     //Change the neighbour fluid cell to interface if the current cell is empty
+					if (tag == iempty)
+					{
+						mesh[current][previous].tag = interface;
+						mesh[other][previous].tag = interface;
+						mesh[current][previous].mass = 0.0;
+						interfaceCells.push_back(previous);
+						sideInterfaces.push_back(previous);
+					}
+					break;
+				case gas:
+					if (tag == ifull)
+					{
+						mesh[current][previous].tag = interface;
+						mesh[other][previous].tag = interface;
+						mesh[current][previous].mass = 0.0;
+						interfaceCells.push_back(previous);
+						sideInterfaces.push_back(previous);
+					}
+					break;
 				}
-				else										//The neighbour cell is fluid
+			}
+
+			//Calculate the extra mass and share it among the surrounding interface cells.
+			double mass = mesh[current][*it].mass;
+			double extraMass = 0.0;
+			if (mass<0 || mass > mesh[current][*it].rho)
+			{
+				//Calculate the extra mass for this cell
+				if (mass < 0)
+					extraMass = -mass;
+				else
+					extraMass = (mass - mesh[current][*it].rho);
+
+				//Share it between the surrounding interface cells or keep it to put it to all interface cells if there are no surrounding cells. 
+				int sideSize = sideInterfaces.size();
+				if (sideSize == 0)
 				{
-					mesh[current][ij].f[l] = mesh[other][previous].f[l];
-				}     
+					excessMass += extraMass;
+				}
+				else
+				{
+					for (sideIt = sideInterfaces.begin(); sideIt != sideInterfaces.end(); ++sideIt)
+						mesh[current][*sideIt].mass += extraMass / (double)sideSize;
+				}
 			}
-
-			//Collision: calculate cell density and velocity
-			double rho = 0.0, ux = 0.0, uy = 0.0;
-			double fi;
-			for (int l = 0; l < finv.size(); l++)
-			{
-				fi = mesh[current][ij].f[l];
-				rho += fi;
-				ux += fi*ex[l];
-				uy += fi*ey[l];
-			}
-			ux = (ux*c)/rho;
-			uy = (uy*c)/rho;
-			//}
-			mesh[current][ij].rho = rho;
-			mesh[current][ij].u[0] = ux;
-			mesh[current][ij].u[1] = uy;
-
-			//Collision: apply gravity
-			ux += tau*g[0];
-			uy += tau*g[1];
-		
-			//Collision
-			for (int l = 0; l < finv.size(); l++)
-			{
-				double eDotu = ex[l] * ux + ey[l] * uy;
-				double f0 = w[l] *rho*(1 - (3.*(ux*ux + uy*uy)) / (2.*c*c) + (3.*eDotu)/c  + (9.*eDotu*eDotu) / (2.*c*c));  
-				mesh[current][ij].f[l] = mesh[current][ij].f[l] - (1 / tau)*(mesh[current][ij].f[l] - f0);
-			}
-
-			//Collision: Calculate velocities for display and particle tracing. 
-			mesh[current][ij].u[0] += 0.5*tau*g[0];
-			mesh[current][ij].u[1] += 0.5*tau*g[1];
 		}
 	}
+
+	//Prepare timestep: Cell type update and remove cells from interface list.
+	std::list<int> notInterfaceCells;
+	for (it = interfaceCells.begin(); it != interfaceCells.end(); ++it)
+	{
+		switch (mesh[current][*it].tag)
+		{
+		case ifull:
+			mesh[current][*it].tag = fluid;
+			mesh[other][*it].tag = fluid;
+			mesh[current][*it].mass = 1.0;
+			notInterfaceCells.push_back(*it);
+			break;
+		case iempty:
+			mesh[current][*it].tag = gas;
+			mesh[other][*it].tag = gas;
+			notInterfaceCells.push_back(*it);
+			mesh[current][*it].u[0] = 0.0;
+			mesh[current][*it].u[1] = 0.0;
+			mesh[current][*it].mass = 0.0;
+			mesh[current][*it].rho = 1.0;
+			mesh[current][*it].f = { { 4. / 9., 1. / 9., 1. / 9., 1. / 9., 1. / 9., 1. / 36., 1. / 36., 1. / 36., 1. / 36. } };
+			break;
+		}
+	}
+
+	//Prepare next timestep: remove the cells that are no longer interface from the interface list. 
+	for (it = notInterfaceCells.begin(); it != notInterfaceCells.end(); ++it)
+	{
+		interfaceCells.remove(*it);
+	}
+
+	//Prepare timestep: If there is excess mass, distribuite it into all the interface cells. 
+	if (excessMass > 0)
+	{
+		int intSize = interfaceCells.size();
+		for (it = interfaceCells.begin(); it != interfaceCells.end(); ++it)
+		{
+			mesh[current][*it].mass += excessMass / (double)intSize;
+		}
+	}
+
 	//Swap meshes
 	other = current;
 	current = 1 - other;
 	std::cout << t << std::endl;
+}
+
+double LBMSolver::Fequi(double ux, double uy, double rho, int l)
+{
+	double eDotu = ex[l] * ux + ey[l] * uy;
+	return w[l] * rho*(1 - (3.*(ux*ux + uy*uy)) / (2.*c*c) + (3.*eDotu) / c + (9.*eDotu*eDotu) / (2.*c*c));
 }
 
 void LBMSolver::Render()
@@ -228,8 +425,8 @@ void LBMSolver::Render()
 		glBegin(GL_TRIANGLE_STRIP);
 		for (int j = 0; j < numCells; j++)
 		{
-			ux.push_back(mesh[other][index(i, j)].u[0] / c);
-			uy.push_back(mesh[other][index(i, j)].u[1] / c);
+			ux.push_back(mesh[current][index(i, j)].u[0] / c);
+			uy.push_back(mesh[current][index(i, j)].u[1] / c);
 			mod.push_back(sqrt(ux.back()*ux.back() + uy.back()*uy.back()));
 			if (vis[2])	 //Colours by velocity
 			{
@@ -237,7 +434,7 @@ void LBMSolver::Render()
 			}
 			else	//Colours by cell tag
 			{
-				inside = colourScale.PickColour((double)mesh[other][index(i, j)].tag, &colourx, &coloury, &colourz);
+				inside = colourScale.PickColour((double)mesh[current][index(i, j)].tag, &colourx, &coloury, &colourz);
 			}
 			if (!inside)
 			{

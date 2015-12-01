@@ -72,7 +72,7 @@ int main(int argc, char* argv[])
 			std::cout << "   1: Previous Reynolds number = 250. Normal gravity" << std::endl;
 			std::cout << "   2: Previous Reynolds number = 100 low resolution. Gravity in +x" << std::endl;
 			std::cout << "   3: Previous Reynolds number = 100 high resolution. Gravity in +x -y" << std::endl;
-			std::cout << "   Previous Reynolds number = 400. No gravity" << std::endl;
+			std::cout << "   4: Previous Reynolds number = 400. No gravity" << std::endl;
 			std::cout << "   Any other number: Manually input the simulation settings. " << std::endl;
 			std::cout << std::endl;
 		    std::cout << "  (WARNING: The simulation may crash or show unrealistic results depending on the manually input settings.)" << std::endl;
@@ -118,7 +118,8 @@ int main(int argc, char* argv[])
 			cavity.Create(1e-6, 7e-4, 0, -9.81, 1000, 0.000006, 0.0005, 150);   //Re 250 
 			break;
 		case 2:
-			cavity.Create(1e-6, 7e-4, -9.81,0, 1000, 0.000005, 0.0001, 150);   //Re 100 coarse
+			//cavity.Create(1e-6, 7e-4, -9.81,0, 1000, 0.000005, 0.0001, 150);   //Re 100 coarse
+			cavity.Create(1e-6, 7e-4, 0, -9.81, 1000, 0.000005, 0.0001, 150);   //Re 100 coarse
 			break;
 		case 3:
 			cavity.Create(1e-6, 7e-4, 4.5, -4.5, 1000, 0.000004, 0.0004, 150);   //Re 100 fine
