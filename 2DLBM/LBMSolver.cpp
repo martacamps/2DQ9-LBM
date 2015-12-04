@@ -199,10 +199,8 @@ void LBMSolver::Render()
 	}
 
 	//Draw and colour the cells of the domain.
-	double psize = 1;
-	glPointSize(psize);
 	glPushMatrix();
-	glScalef((0.9*win_width) / (psize*numCells), win_height / (psize*numCells), 1.);
+	glScalef((0.9*win_width) / numCells, win_height / numCells, 1.);
 	glShadeModel(GL_FLAT);
 	std::vector<double> ux, uy, mod;
 	double colourx, coloury, colourz;
@@ -237,9 +235,9 @@ void LBMSolver::Render()
 				colourx = 0.0; coloury = 0.0; colourz = 0.0;
 			}
 			glColor3f(colourx, coloury, colourz);
-			glVertex2f(j, i + psize);
+			glVertex2f(j, i + 1);
 			glVertex2f(j, i);
-			glVertex2f(j + 1, i + psize);
+			glVertex2f(j + 1, i + 1);
 			glVertex2f(j + 1, i);
 
 		}
