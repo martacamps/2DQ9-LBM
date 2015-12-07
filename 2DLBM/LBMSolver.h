@@ -25,6 +25,12 @@
 #include "LBMCell.h"
 #include "cSolver.h"
 
+enum cellTag
+{
+	fluid, gas, interface, ifull, iempty, slipbc, noslipbc
+};
+
+
 
 class LBMSolver : public cSolver
 {
@@ -45,11 +51,13 @@ private:
 	double tau;							//relaxation time
 	double c;							//lattice speed
 	double sigma;						//surface tension parameter
+	double p;							//pressure parameter
 	double cellSize;	                //cell Size in meters
 	int numCells;						//number of cells in each direction
 	double dt;                          //lenght of each time step in seconds
 	int current, other;					//To differenciate between the current mesh and the auxiliar mesh
 	LBMCell **mesh;                     //LBM mesh
+	cellTag *tags;						//Cell type for each cell in the grid.
 	int index(int i, int j) { return i*numCells + j; }        //To access the mesh array as it was a 2D matrix.
 	double Fequi(double ux, double uy, double rho, int l);    //equilibrium function
 	std::array<double, 2> g;			//acceleration of gravity

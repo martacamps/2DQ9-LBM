@@ -22,10 +22,10 @@
 
 #pragma once
 
-enum cellTag
-{
-	fluid, gas, interface, ifull, iempty, slipbc, noslipbc
-};
+//enum cellTag
+//{
+//	fluid, gas, interface, ifull, iempty, slipbc, noslipbc
+//};
 
 struct LBMCell
 {
@@ -33,7 +33,7 @@ struct LBMCell
 	double rho = 1;            //cell density
 	std::array<double, 2> u;   //cell velocity
 	std::array<double, 9> f;   //particle distribution functions
-	cellTag tag = gas;         //cell type
+	//cellTag tag = gas;         //cell type
 	// bool newInterface = false; //true if the cell will change to a interface cell in the next step
 
 	LBMCell::LBMCell() : f({ { 4. / 9., 1. / 9., 1. / 9., 1. / 9., 1. / 9., 1. / 36., 1. / 36., 1. / 36., 1. / 36. } }), u({ { 0., 0. } }){}
