@@ -21,6 +21,7 @@
 
 
 #pragma once
+#include "cPoint.h"
 
 //enum cellTag
 //{
@@ -29,13 +30,23 @@
 
 struct LBMCell
 {
-	double mass = 1;           //cell mass
+	double mass = 0;           //cell mass
 	double rho = 1;            //cell density
 	std::array<double, 2> u;   //cell velocity
 	std::array<double, 9> f;   //particle distribution functions
+	std::array<double,2>  n;   //normal vector to the free surface
+	double curvature;		   //curvature of the free surface.
+	//double epsilon = 0.0;	   //How filled with water is the cell
+	cPoint coord;              //Coordinates of the cell in the mesh. It also stores its fill level. 
 	//cellTag tag = gas;         //cell type
 	// bool newInterface = false; //true if the cell will change to a interface cell in the next step
 
-	LBMCell::LBMCell() : f({ { 4. / 9., 1. / 9., 1. / 9., 1. / 9., 1. / 9., 1. / 36., 1. / 36., 1. / 36., 1. / 36. } }), u({ { 0., 0. } }){}
+	LBMCell::LBMCell() : 
+		f({ { 4. / 9., 1. / 9., 1. / 9., 1. / 9., 1. / 9., 1. / 36., 1. / 36., 1. / 36., 1. / 36. } }),
+		u({ { 0., 0. } }),
+		n({ { 0., 0. } }){}
+
+	void InitFluid();         //Initialize the cell as fluid
+	void InitGas();			  //Initialize the cell as gas
 
 }; 

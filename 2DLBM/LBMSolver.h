@@ -24,10 +24,11 @@
 
 #include "LBMCell.h"
 #include "cSolver.h"
+#include "cPoint.h"
 
 enum cellTag
 {
-	fluid, gas, interface, ifull, iempty, slipbc, noslipbc
+	fluid, gas, interface, ifull, iempty, ifluid, igas, inew, slipbc, noslipbc
 };
 
 
@@ -43,6 +44,7 @@ public:
 	void InitialField();       
 	//2DQ9 LBM time step
 	void TimeStep(double t);
+	//
 	//Draws the state of the simulation.
 	void Render();            
 	~LBMSolver();
@@ -59,13 +61,17 @@ private:
 	LBMCell **mesh;                     //LBM mesh
 	cellTag *tags;						//Cell type for each cell in the grid.
 	int index(int i, int j) { return i*numCells + j; }        //To access the mesh array as it was a 2D matrix.
+	void separateIndex(int ij, int*i, int*j) {*i = ij / numCells; *j = ij - numCells*(*i);}
 	double Fequi(double ux, double uy, double rho, int l);    //equilibrium function
 	std::array<double, 2> g;			//acceleration of gravity
 	const std::array<double, 9> w;		//Weights
 	const std::array<int, 9> ex;        //x components of the velocity vectors
 	const std::array<int, 9> ey;        //y components of the velocity vectors
+	const std::array<double, 9> modE;   //Modulus of each direction vector e. 
 	const std::array<int, 9> finv;      //Index of the velocity vector pointing in the opposite direction for each of the 9 velocity vectors. 
 	std::list<int> changeTag;           //List of the cells that are going to change tag at the begining of the next step
-	std::list<int> interfaceCells;     //List of the cells in the interface. 
+	std::list<int> interfaceCells;      //List of the cells in the interface. 
+	std::list<cPoint> freeSurface;		//List with points on the free surface
+
 };
 

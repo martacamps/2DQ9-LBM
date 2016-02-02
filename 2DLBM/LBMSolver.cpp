@@ -20,11 +20,13 @@
 #include "stdafx.h"
 #include "LBMSolver.h"
 
+#define sqrt2 1.4142135623730950488
 
 LBMSolver::LBMSolver() :
 w({ { 4. / 9., 1. / 9., 1. / 9., 1. / 9., 1. / 9., 1. / 36., 1. / 36., 1. / 36., 1. / 36. } }),
 ex({ { 0, 1, -1, 0, 0, 1, -1, 1, -1 } }),
 ey({ { 0, 0, 0, 1, -1, -1, -1, 1, 1 } }),
+modE({ {0, 1,1,1,1, sqrt2, sqrt2, sqrt2, sqrt2} }),
 finv({ { 0, 2, 1, 4, 3, 8, 7, 6, 5 } }),
 current(0),
 other(1)
@@ -40,7 +42,7 @@ void LBMSolver::Create(double nu, double sig, double fx, double fy, double rho, 
 	//Compute necessary information from input parameters
 	double gMag = sqrt(fx*fx + fy*fy);
 	if (gMag > 0)
-		dt = sqrt((0.5e-3*cellSize) / sqrt(fx*fx + fy*fy));    // So the gravity acceleration in the model is not larger than 1e-4.
+		dt = sqrt((1e-4*cellSize) / sqrt(fx*fx + fy*fy));    // So the gravity acceleration in the model is not larger than 1e-4.
 	else
 		dt = cellSize;
 	g[0] = fx*(dt*dt) / cellSize;
@@ -71,6 +73,19 @@ void LBMSolver::Create(double nu, double sig, double fx, double fy, double rho, 
 	tags = new cellTag[numCells*numCells];
 	for (int i = 0; i < numCells*numCells; i++)
 		tags[i] = gas;
+
+	//Calculate coordinates of each cell. 
+	for (int i = 0; i < numCells; i++)
+	{
+		for (int j = 0; j < numCells; j++)
+		{
+			int ij = index(i, j);
+			mesh[current][ij].coord.x = j + 0.5;
+			mesh[current][ij].coord.y = i + 0.5;
+			mesh[other][ij].coord.x = j + 0.5;
+			mesh[other][ij].coord.y = i + 0.5;
+		}
+	}
 
 }
 
@@ -103,27 +118,37 @@ void LBMSolver::InitialField()
 		for (int j = 1; j < fsizex; j++)
 		{
 			tags[index(i, j)] = fluid;
+			mesh[current][index(i, j)].InitFluid();
+			mesh[other][index(i, j)].InitFluid();
 		}
 		tags[index(i, fsizex)] = interface;
 		mesh[current][index(i, fsizex)].mass = 0.5;
+		mesh[current][index(i, fsizex)].coord.value = 0.5;
 		interfaceCells.push_back(index(i, fsizex));
 		tags[index(i, fsizex)] = interface;
 		mesh[other][index(i, fsizex)].mass = 0.5;
+		mesh[other][index(i, fsizex)].coord.value = 0.5;
 	}
 	for (int j = 1; j <= fsizex; j++)
 	{
 		tags[index(fsizey, j)] = interface;
 		mesh[current][index(fsizey, j)].mass =  0.5;
+		mesh[current][index(fsizey, j)].coord.value = 0.5;
 		interfaceCells.push_back(index(fsizey, j));
 		tags[index(fsizey, j)] = interface;
 		mesh[other][index(fsizey, j)].mass =  0.5;
+		mesh[current][index(fsizey, j)].coord.value = 0.5;
 	}
+	mesh[current][index(fsizey, fsizex)].coord.value = 0.01;
+	mesh[other][index(fsizey, fsizex)].coord.value = 0.01;
+	mesh[current][index(fsizey, fsizex)].mass = 0.01;
+	mesh[other][index(fsizey, fsizex)].mass = 0.01;
 }
 
 void LBMSolver::TimeStep(double t)
 {
 	//TimeStep
-	double epsilon, nextEpsilon, f0, f0inv,tempMass;
+	double f0, f0inv,tempMass;
 
 	int ue = 0;
 	for (int i = 1; i < numCells-1; i++)
@@ -134,11 +159,9 @@ void LBMSolver::TimeStep(double t)
 
 			if (tags[ij] != gas)
 			{
-
-				switch(tags[ij])
+				//Streaming
+				if (tags[ij] == fluid)
 				{
-				case fluid:
-					//Streaming. 
 					for (int l = 0; l < finv.size(); l++)
 					{
 						int inv = finv[l];
@@ -154,54 +177,137 @@ void LBMSolver::TimeStep(double t)
 							mesh[current][ij].f[l] = mesh[other][previous].f[l];
 						}
 					}
-					break;
-				case interface :
-					tempMass = 0.0;
-					//Streaming.
+				}
+				else    //Tags = interface, ifluid or igas
+				{
 					mesh[current][ij].f[0] = mesh[other][ij].f[0];  //Stream
 					for (int l = 1; l < finv.size(); l++)
 					{
 						int inv = finv[l];
 						int previous = index(i + ey[inv], j + ex[inv]);
-						int next = index(i + ey[l], j + ex[l]);
 
 						//check the type of the neighbour cell and perform streaming. //I COULD DO THIS WITH A FOREACH IF I PUT THE LINES OF CODE INTO A FUNCTION (MAYBE IT IS MORE EFFICIENT)
-						switch (tags[previous])
+						if (tags[previous] == gas) //Surface reconstruction and apply surface forces
 						{
-						case fluid:
-							mesh[current][ij].f[l] = mesh[other][previous].f[l];  //Stream
-							break;
-						case interface:   //THE SAME AS FLUID (I THINK) I CAN PUT THEM TOGETHER.
-							mesh[current][ij].f[l] = mesh[other][previous].f[l];  //Stream
-							break;
-						case gas:
 							f0inv = Fequi(mesh[other][ij].u[0], mesh[other][ij].u[1], 1.0, inv);
-							f0 = Fequi(mesh[other][ij].u[0], mesh[other][ij].u[1], 1.0, l);
+							f0 = Fequi(mesh[other][ij].u[0], mesh[other][ij].u[1], 1.0, l); //NOTE: IT IS USING THE VELOCITY MODIFIED BY 0.5*GRAVITY, NOT THE ONE USED FOR COLISION. 
 							mesh[current][ij].f[l] = f0inv + f0 - mesh[other][ij].f[l];    //Surface reconstruction. FALTA LA SURFACE TENSION I LA PRESSURE. 
-							break;
-						case noslipbc:    //The neighbour cell is a non slip wall
+						}
+						else if (tags[previous] == noslipbc) //The neighbour cell is a non slip wall
+						{
 							mesh[current][ij].f[l] = mesh[current][ij].f[inv];
-							break;
 						}
-
-						//Mass update
-						if (tags[next] == interface ) //|| tags[next] == fluid)
+						else  // The neighbour is fluid or interface, ifluid or igas
 						{
-							epsilon = mesh[other][ij].mass / mesh[other][ij].rho;  //Fill level of the current cell
-							nextEpsilon = mesh[other][next].mass / mesh[other][next].rho;  // Fill level of the next cell
-							//tempMass += nextEpsilon*mesh[other][next].f[inv] - epsilon*mesh[other][ij].f[l];
-							tempMass += 0.5*(nextEpsilon+epsilon)*(mesh[other][next].f[inv] - mesh[other][ij].f[l]);
-						}
-						if (tags[next] == fluid)
-						{
-							tempMass += mesh[other][next].f[inv] - mesh[other][ij].f[l];
+							mesh[current][ij].f[l] = mesh[other][previous].f[l];  //Stream
 						}
 					}
-					mesh[current][ij].mass = mesh[other][ij].mass + tempMass;
-					break;
+
+					//Mass update
+					tempMass = 0.0;
+					switch (tags[ij])
+					{
+					case interface :
+						for (int l = 1; l < 9; l++)
+						{
+							int next = index(i + ey[l], j + ex[l]);
+							int inv = finv[l];
+							//Mean normal vector
+							double nx = (mesh[other][ij].n[0] + mesh[other][next].n[0])*0.5;
+							double ny = (mesh[other][ij].n[1] + mesh[other][next].n[1])*0.5;
+							double n = (ex[l] * nx + ey[l] * ny) / modE[l];
+							switch (tags[next])
+							{
+							case fluid:
+								tempMass += mesh[other][next].f[inv] - mesh[other][ij].f[l];
+								break;
+							case interface:
+								tempMass += 0.5*(mesh[other][next].coord.value + mesh[other][ij].coord.value) * (mesh[other][next].f[inv] - mesh[other][ij].f[l]);
+								break;
+							case ifluid:
+								if (n > 0)
+									tempMass += n*mesh[other][next].coord.value*mesh[other][next].f[inv];
+								break;
+							case igas:
+								if (n < 0)
+									tempMass -= n*(1. - mesh[other][next].coord.value)*mesh[other][ij].f[l];
+								break;
+							}
+						}
+						mesh[current][ij].mass = mesh[other][ij].mass + tempMass;
+						break;
+					case ifluid :
+						for (int l = 1; l < 9; l++)
+						{
+							int next = index(i + ey[l], j + ex[l]);
+							int inv = finv[l];
+							//Mean normal vector
+							double nx = (mesh[other][ij].n[0] + mesh[other][next].n[0])*0.5;
+							double ny = (mesh[other][ij].n[1] + mesh[other][next].n[1])*0.5;
+							double n = (ex[l] * nx + ey[l] * ny) / modE[l];
+							switch (tags[next])
+							{
+							case fluid:
+								tempMass += mesh[other][next].f[inv] - mesh[other][ij].f[l];
+								break;
+							case interface :
+								if (n < 0)
+									tempMass -= n*mesh[other][ij].coord.value*mesh[other][ij].f[l];
+								break;
+							case ifluid:
+								if (n <= 0)
+									tempMass -= mesh[other][ij].coord.value*mesh[other][ij].f[l];
+								else
+									tempMass += mesh[other][next].coord.value*mesh[other][next].f[inv];
+								break;
+							case igas:
+								if (n <= 0)
+									tempMass -= (1 - mesh[other][next].coord.value)*mesh[other][ij].f[l];
+								else
+									tempMass += (1 - mesh[other][ij].coord.value)*mesh[other][next].f[inv];
+								break;
+							}
+						}
+						mesh[current][ij].mass = mesh[other][ij].mass + tempMass;
+						break;
+					case igas:
+						for (int l = 1; l < 9; l++)
+						{
+							int next = index(i + ey[l], j + ex[l]);
+							int inv = finv[l];
+							//Mean normal vector
+							double nx = (mesh[other][ij].n[0] + mesh[other][next].n[0])*0.5;
+							double ny = (mesh[other][ij].n[1] + mesh[other][next].n[1])*0.5;
+							double n = (ex[l] * nx + ey[l] * ny) / modE[l];
+							switch (tags[next])
+							{
+							case fluid:
+								tempMass += mesh[other][next].f[inv] - mesh[other][ij].f[l];
+								break;
+							case interface :
+								if (n > 0)
+									tempMass += n*(1-mesh[other][ij].coord.value)*mesh[other][next].f[inv];
+								break;
+							case ifluid:
+								if (n <= 0)
+									tempMass -= mesh[other][ij].coord.value*mesh[other][ij].f[l];
+								else
+									tempMass += mesh[other][next].coord.value*mesh[other][next].f[inv];
+								break;
+							case igas:
+								if (n <= 0)
+									tempMass -= (1 - mesh[other][next].coord.value)*mesh[other][ij].f[l];
+								else
+									tempMass += (1 - mesh[other][ij].coord.value)*mesh[other][next].f[inv];
+								break;
+							}
+						}
+						mesh[current][ij].mass = mesh[other][ij].mass + tempMass;
+						break;
+					}
 				}
 
-				//Collision: calculate cell density and velocity
+			    //Collision: calculate cell density and velocity
 				double rho = 0.0, ux = 0.0, uy = 0.0;
 				double fi;
 				for (int l = 0; l < finv.size(); l++)
@@ -259,8 +365,9 @@ void LBMSolver::TimeStep(double t)
 	for (it = interfaceCells.begin(); it != interfaceCells.end(); ++it)
 	{
 		//Calculate the position of the cell to be able to search its neighbours. 
-		int i = *it / numCells;
-		int j = *it - numCells*i;
+
+		int i, j;
+		separateIndex(*it, &i, &j);
 		int tag = tags[*it];
 		std::list<int> sideInterfaces;
 		double lackMass = 0.;
@@ -277,23 +384,27 @@ void LBMSolver::TimeStep(double t)
 
 				switch (tags[previous])
 				{
-				case interface :
-					if ((l >= 1 && l <= 4) && ((tags[previous2] == fluid) || (tags[previous2] == noslipbc)))  // If the cell next to the interface is fluid or a wall, I have to fill the interface cell with fluid.
-					{
-						tags[previous] = ifull;
-						lackMass += mesh[current][previous].rho - mesh[current][previous].mass;
-					}
-					else
-					{
+				//case interface :
+					//if ((l >= 1 && l <= 4) && ((tags[previous2] == fluid) || (tags[previous2] == noslipbc)))  // If the cell next to the interface is fluid or a wall, I have to fill the interface cell with fluid.
+					//{
+					//	tags[previous] = ifull;
+					//	lackMass += mesh[current][previous].rho - mesh[current][previous].mass;
+					//}
+					//else
+					//{
 						//sideInterfaces.push_back(previous);
-					}
+					//}
+					//break;
+				case inew:     // If it is an interface cell created this loop it has to be put in the side interfaces list to share the excess mass. 
+					sideInterfaces.push_back(previous);
 					break;
 				case gas:  
-					tags[previous] = interface;
+					tags[previous] = inew;
 					mesh[current][previous].f = mesh[current][*it].f;  //Copy the distribution functions from the filled interface cell. 
 					mesh[current][previous].mass = 0.0;
 					interfaceCells.push_back(previous);
 					sideInterfaces.push_back(previous);
+					break;
 				}
 			}
 		}
@@ -308,19 +419,22 @@ void LBMSolver::TimeStep(double t)
 
 				switch (tags[previous])
 				{
-				case interface :
-					if ((l>=1 && l<=4) && ((tags[previous2] == gas) || (tags[previous2]==noslipbc)))  // If the cell next to the interface is fluid or a wall, I have to fill the interface cell with fluid.
-					{
-						tags[previous] = iempty;
-						extraMass += mesh[current][previous].mass;
-					}
-					else
-					{
+				//case interface :
+					//if ((l>=1 && l<=4) && ((tags[previous2] == gas) || (tags[previous2]==noslipbc)))  // If the cell next to the interface is fluid or a wall, I have to fill the interface cell with fluid.
+					//{
+					//    tags[previous] = iempty;
+					//	extraMass += mesh[current][previous].mass;
+					//}
+					//else
+					//{
 						//sideInterfaces.push_back(previous);
-					}
+					//}
+				//	break;
+				case inew:
+					sideInterfaces.push_back(previous);
 					break;
 				case fluid:  
-					tags[previous] = interface;
+					tags[previous] = inew;
 					mesh[current][previous].mass = mesh[current][previous].rho;
 					interfaceCells.push_back(previous);
 					sideInterfaces.push_back(previous);
@@ -360,24 +474,24 @@ void LBMSolver::TimeStep(double t)
 	{
 		switch (tags[*it])
 		{
+		case inew:
+			tags[*it] = interface;
+			break;
 		case ifull:
 			tags[*it] = fluid;
-			mesh[current][*it].mass = 1.0;
+			mesh[current][*it].InitFluid();
+			mesh[other][*it].InitFluid();
 			notInterfaceCells.push_back(*it);
 			break;
 		case iempty:
 			tags[*it] = gas;
 			notInterfaceCells.push_back(*it);
-			mesh[current][*it].u[0] = 0.0;
-			mesh[current][*it].u[1] = 0.0;
-			mesh[current][*it].mass = 0.0;
-			mesh[current][*it].rho = 1.0;
-			mesh[current][*it].f = { { 4. / 9., 1. / 9., 1. / 9., 1. / 9., 1. / 9., 1. / 36., 1. / 36., 1. / 36., 1. / 36. } };
-			mesh[other][*it].u[0] = 0.0;
-			mesh[other][*it].u[1] = 0.0;
-			mesh[other][*it].mass = 0.0;
-			mesh[other][*it].rho = 1.0;
-			mesh[other][*it].f = { { 4. / 9., 1. / 9., 1. / 9., 1. / 9., 1. / 9., 1. / 36., 1. / 36., 1. / 36., 1. / 36. } };
+			mesh[current][*it].InitGas();
+			//mesh[current][*it].rho = 1.0;
+			//mesh[current][*it].f = { { 4. / 9., 1. / 9., 1. / 9., 1. / 9., 1. / 9., 1. / 36., 1. / 36., 1. / 36., 1. / 36. } };
+			mesh[other][*it].InitGas();
+			//mesh[other][*it].rho = 1.0;
+			//mesh[other][*it].f = { { 4. / 9., 1. / 9., 1. / 9., 1. / 9., 1. / 9., 1. / 36., 1. / 36., 1. / 36., 1. / 36. } };
 			break;
 		}
 	}
@@ -389,12 +503,91 @@ void LBMSolver::TimeStep(double t)
 	}
 
 	//Prepare timestep: If there is excess mass, distribuite it into all the interface cells. 
-	if (excessMass > 0)
+	if (abs(excessMass) > 0)
 	{
 		int intSize = interfaceCells.size();
 		for (it = interfaceCells.begin(); it != interfaceCells.end(); ++it)
 		{
 			mesh[current][*it].mass += excessMass / (double)intSize;
+		}
+	}
+
+	//Prepare timestep: sort the interface list
+	interfaceCells.sort();
+
+	//Prepare timestep: Update the fill level of all the interface cells
+	for (it = interfaceCells.begin(); it != interfaceCells.end(); ++it)
+	{
+		mesh[current][*it].coord.value = mesh[current][*it].mass / mesh[current][*it].rho;
+	}
+	//clear the freeSurface points list
+	freeSurface.clear();
+
+	//Prepare timestep: Calculate the position of the interface and its normal vector and curvature. Tag the double interface layers.
+	for (it = interfaceCells.begin(); it != interfaceCells.end(); ++it)
+	{
+		//Check for the position of the free surface and save the points in surfaceNext
+		std::list<cPoint> surfaceNext;
+		int i, j;
+		separateIndex(*it, &i, &j);
+		for (int ii = i - 1; ii < i + 1; ii++)
+		{
+			for (int jj = j - 1; jj < j + 1; jj++)
+			{
+				cPoint dum(&(mesh[current][index(ii + 1, jj)].coord), &(mesh[current][index(ii, jj)].coord), 0.5);
+				if (dum.value == 0.5)
+					surfaceNext.push_back(dum);
+				cPoint dum2(&(mesh[current][index(ii, jj+1)].coord), &(mesh[current][index(ii, jj)].coord), 0.5);
+				if (dum2.value == 0.5)
+					surfaceNext.push_back(dum2);
+			}
+			cPoint dum3(&(mesh[current][index(ii + 1, j+1)].coord), &(mesh[current][index(ii, j+1)].coord), 0.5);
+			if (dum3.value == 0.5)
+				surfaceNext.push_back(dum3);
+		}
+		for (int jj = j - 1; jj < j + 1; jj++)
+		{
+			cPoint dum(&(mesh[current][index(i + 1, jj+1)].coord), &(mesh[current][index(i+1, jj)].coord), 0.5);
+			if (dum.value == 0.5)
+				surfaceNext.push_back(dum);
+		}
+
+		//Order the points. I hope ordering them only with x is enough. THERE IS NO NEED. YOU CAN ORDER THE POINTS WHEN YOU CALCULATE THE CURVATURE. 
+		//surfaceNext.sort(cPoint::SortX);
+
+		//CALCULATE CURVATURE AND NORMAL VECTOR AND STORE THE DATA IN THE CELL. 
+		//Calculate normal vector with the gradient of the filling. 
+		mesh[current][*it].n[0] = -(mesh[current][index(i, j + 1)].coord.value - mesh[current][*it].coord.value) / 1.0;
+		mesh[current][*it].n[1] = -(mesh[current][index(i+1, j)].coord.value - mesh[current][*it].coord.value) / 1.0;
+		double mod = sqrt(mesh[current][*it].n[0] * mesh[current][*it].n[0] + mesh[current][*it].n[1] * mesh[current][*it].n[1]);
+		mesh[current][*it].n[0] /= mod;
+		mesh[current][*it].n[1] /= mod;
+
+		//Append surfaceNext to the surface points list. (CHECK FOR THE REPEATED VALUES AND DO NOT APPEND THOSE)
+		freeSurface.splice(freeSurface.end(), surfaceNext);
+
+		//Update the tag of the interface cell: interface, ifluid, igas
+		bool gasCell = false;
+		bool fluidCell = false;
+		for (int l = 0; l < 9; l++)
+		{
+			int inv = finv[l];
+			int previous = index(i + ey[inv], j + ex[inv]);
+			if (tags[previous] == fluid)
+				fluidCell = true;
+			if (tags[previous] == gas)
+				gasCell = true;
+		}
+		if (gasCell && fluidCell)
+			tags[*it] = interface;
+		else if (gasCell && !fluidCell)
+			tags[*it] = igas;
+		else if (!gasCell && fluidCell)
+			tags[*it] = ifluid;
+		else
+		{
+			std::string str("Interface cell surrounded only by interface cells!");
+			throw(str);  
 		}
 	}
 
@@ -423,7 +616,7 @@ void LBMSolver::Render()
 	std::string title;
 	if (vis[2])  //Colours by velocity
 	{
-		double maxSpeed = 0.1;
+		double maxSpeed = 0.001;
 		for (int i = 0; i < 6; i++)
 			intervals.push_back(i*maxSpeed / 5.0);
 		colourScale.SetIntervals(&intervals);
@@ -438,7 +631,7 @@ void LBMSolver::Render()
 	}
 	else       //Colours by cell tag
 	{
-		intervals = { fluid, gas, interface, ifull, iempty, slipbc, noslipbc };
+		intervals = { fluid, gas, interface, ifluid, igas, slipbc, noslipbc };
 		colourScale.SetIntervals(&intervals);
 		colours = { 0.2, 0.6, 1.0,   1., 1., 1.,    0.,0.,0.8,  1.0,0.,0.,    0.,1.,0.,   0.4,0.5,0.6,     0.4, 0.2, 0. };   //light blue, white, dark blue, red, green, grey, brown.
 		colourScale.SetColours(&colours, 7);
@@ -447,7 +640,6 @@ void LBMSolver::Render()
 
 	//Draw and colour the cells of the domain.
 	double psize = 1;
-	glPointSize(psize);
 	glPushMatrix();
 	glScalef((0.9*win_width) / (psize*numCells), win_height / (psize*numCells), 1.);
 	glShadeModel(GL_FLAT);
@@ -459,8 +651,8 @@ void LBMSolver::Render()
 		glBegin(GL_TRIANGLE_STRIP);
 		for (int j = 0; j < numCells; j++)
 		{
-			ux.push_back(mesh[current][index(i, j)].u[0] / c);
-			uy.push_back(mesh[current][index(i, j)].u[1] / c);
+			ux.push_back(mesh[other][index(i, j)].u[0] / c);
+			uy.push_back(mesh[other][index(i, j)].u[1] / c);
 			mod.push_back(sqrt(ux.back()*ux.back() + uy.back()*uy.back()));
 			if (vis[2])	 //Colours by velocity
 			{
@@ -483,6 +675,23 @@ void LBMSolver::Render()
 		}
 		glEnd();
 	}
+
+	//Draw free surface points. DRAW THEM ALWAYS FOR THE MOMENT
+	glPointSize(3);
+	glColor3f(0., 0.0, 0.);
+	glBegin(GL_POINTS);
+	for (std::list<cPoint>::const_iterator it = freeSurface.begin(); it != freeSurface.end(); ++it)
+		glVertex2f(it->x, it->y);
+	glEnd();
+	//Draw normal vectors
+	/*glColor3f(0., 1., 0.);
+	glBegin(GL_LINES);
+	for (std::list<int>::const_iterator it = interfaceCells.begin(); it != interfaceCells.end(); ++it)
+	{
+		glVertex2f(mesh[other][*it].coord.x, mesh[other][*it].coord.y);
+		glVertex2f(mesh[other][*it].coord.x + mesh[other][*it].n[0], mesh[other][*it].coord.y+ mesh[other][*it].n[1]);
+	}
+	glEnd();*/
 
 
 	//Draw cell velocity vectors
@@ -524,11 +733,11 @@ void LBMSolver::Render()
 
 LBMSolver::~LBMSolver()
 {
-	if (mesh)
-	{
-		delete mesh[0];
-		delete mesh[1];
-		delete mesh;
-	}
+	//if (mesh)
+	//{
+	//	delete mesh[0];
+	//	delete mesh[1];
+	//	delete mesh;
+	//}
 
 }
