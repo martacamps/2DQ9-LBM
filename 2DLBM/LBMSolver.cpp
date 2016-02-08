@@ -80,10 +80,10 @@ void LBMSolver::Create(double nu, double sig, double fx, double fy, double rho, 
 		for (int j = 0; j < numCells; j++)
 		{
 			int ij = index(i, j);
-			mesh[current][ij].coord.x = j + 0.5;
-			mesh[current][ij].coord.y = i + 0.5;
-			mesh[other][ij].coord.x = j + 0.5;
-			mesh[other][ij].coord.y = i + 0.5;
+			mesh[current][ij].coord[0] = j + 0.5;
+			mesh[current][ij].coord[1] = i + 0.5;
+			mesh[other][ij].coord[0] = j + 0.5;
+			mesh[other][ij].coord[1] = i + 0.5;
 		}
 	}
 
@@ -123,24 +123,24 @@ void LBMSolver::InitialField()
 		}
 		tags[index(i, fsizex)] = interface;
 		mesh[current][index(i, fsizex)].mass = 0.5;
-		mesh[current][index(i, fsizex)].coord.value = 0.5;
+		mesh[current][index(i, fsizex)].coord[3] = 0.5;
 		interfaceCells.push_back(index(i, fsizex));
 		tags[index(i, fsizex)] = interface;
 		mesh[other][index(i, fsizex)].mass = 0.5;
-		mesh[other][index(i, fsizex)].coord.value = 0.5;
+		mesh[other][index(i, fsizex)].coord[3] = 0.5;
 	}
 	for (int j = 1; j <= fsizex; j++)
 	{
 		tags[index(fsizey, j)] = interface;
 		mesh[current][index(fsizey, j)].mass =  0.5;
-		mesh[current][index(fsizey, j)].coord.value = 0.5;
+		mesh[current][index(fsizey, j)].coord[3] = 0.5;
 		interfaceCells.push_back(index(fsizey, j));
 		tags[index(fsizey, j)] = interface;
 		mesh[other][index(fsizey, j)].mass =  0.5;
-		mesh[current][index(fsizey, j)].coord.value = 0.5;
+		mesh[current][index(fsizey, j)].coord[3] = 0.5;
 	}
-	mesh[current][index(fsizey, fsizex)].coord.value = 0.01;
-	mesh[other][index(fsizey, fsizex)].coord.value = 0.01;
+	mesh[current][index(fsizey, fsizex)].coord[3] = 0.01;
+	mesh[other][index(fsizey, fsizex)].coord[3] = 0.01;
 	mesh[current][index(fsizey, fsizex)].mass = 0.01;
 	mesh[other][index(fsizey, fsizex)].mass = 0.01;
 }
@@ -222,15 +222,15 @@ void LBMSolver::TimeStep(double t)
 								tempMass += mesh[other][next].f[inv] - mesh[other][ij].f[l];
 								break;
 							case interface:
-								tempMass += 0.5*(mesh[other][next].coord.value + mesh[other][ij].coord.value) * (mesh[other][next].f[inv] - mesh[other][ij].f[l]);
+								tempMass += 0.5*(mesh[other][next].coord[3] + mesh[other][ij].coord[3]) * (mesh[other][next].f[inv] - mesh[other][ij].f[l]);
 								break;
 							case ifluid:
 								if (n > 0)
-									tempMass += n*mesh[other][next].coord.value*mesh[other][next].f[inv];
+									tempMass += n*mesh[other][next].coord[3]*mesh[other][next].f[inv];
 								break;
 							case igas:
 								if (n < 0)
-									tempMass -= n*(1. - mesh[other][next].coord.value)*mesh[other][ij].f[l];
+									tempMass -= n*(1. - mesh[other][next].coord[3])*mesh[other][ij].f[l];
 								break;
 							}
 						}
@@ -252,19 +252,19 @@ void LBMSolver::TimeStep(double t)
 								break;
 							case interface :
 								if (n < 0)
-									tempMass -= n*mesh[other][ij].coord.value*mesh[other][ij].f[l];
+									tempMass -= n*mesh[other][ij].coord[3]*mesh[other][ij].f[l];
 								break;
 							case ifluid:
 								if (n <= 0)
-									tempMass -= mesh[other][ij].coord.value*mesh[other][ij].f[l];
+									tempMass -= mesh[other][ij].coord[3]*mesh[other][ij].f[l];
 								else
-									tempMass += mesh[other][next].coord.value*mesh[other][next].f[inv];
+									tempMass += mesh[other][next].coord[3]*mesh[other][next].f[inv];
 								break;
 							case igas:
 								if (n <= 0)
-									tempMass -= (1 - mesh[other][next].coord.value)*mesh[other][ij].f[l];
+									tempMass -= (1 - mesh[other][next].coord[3])*mesh[other][ij].f[l];
 								else
-									tempMass += (1 - mesh[other][ij].coord.value)*mesh[other][next].f[inv];
+									tempMass += (1 - mesh[other][ij].coord[3])*mesh[other][next].f[inv];
 								break;
 							}
 						}
@@ -286,19 +286,19 @@ void LBMSolver::TimeStep(double t)
 								break;
 							case interface :
 								if (n > 0)
-									tempMass += n*(1-mesh[other][ij].coord.value)*mesh[other][next].f[inv];
+									tempMass += n*(1-mesh[other][ij].coord[3])*mesh[other][next].f[inv];
 								break;
 							case ifluid:
 								if (n <= 0)
-									tempMass -= mesh[other][ij].coord.value*mesh[other][ij].f[l];
+									tempMass -= mesh[other][ij].coord[3]*mesh[other][ij].f[l];
 								else
-									tempMass += mesh[other][next].coord.value*mesh[other][next].f[inv];
+									tempMass += mesh[other][next].coord[3]*mesh[other][next].f[inv];
 								break;
 							case igas:
 								if (n <= 0)
-									tempMass -= (1 - mesh[other][next].coord.value)*mesh[other][ij].f[l];
+									tempMass -= (1 - mesh[other][next].coord[3])*mesh[other][ij].f[l];
 								else
-									tempMass += (1 - mesh[other][ij].coord.value)*mesh[other][next].f[inv];
+									tempMass += (1 - mesh[other][ij].coord[3])*mesh[other][next].f[inv];
 								break;
 							}
 						}
@@ -518,7 +518,7 @@ void LBMSolver::TimeStep(double t)
 	//Prepare timestep: Update the fill level of all the interface cells
 	for (it = interfaceCells.begin(); it != interfaceCells.end(); ++it)
 	{
-		mesh[current][*it].coord.value = mesh[current][*it].mass / mesh[current][*it].rho;
+		mesh[current][*it].coord[3] = mesh[current][*it].mass / mesh[current][*it].rho;
 	}
 	//clear the freeSurface points list
 	freeSurface.clear();
@@ -534,21 +534,21 @@ void LBMSolver::TimeStep(double t)
 		{
 			for (int jj = j - 1; jj < j + 1; jj++)
 			{
-				cPoint dum(&(mesh[current][index(ii + 1, jj)].coord), &(mesh[current][index(ii, jj)].coord), 0.5);
-				if (dum.value == 0.5)
+				cPoint dum((mesh[current][index(ii + 1, jj)].coord), (mesh[current][index(ii, jj)].coord), 0.5);
+				if (dum[3] == 0.5)
 					surfaceNext.push_back(dum);
-				cPoint dum2(&(mesh[current][index(ii, jj+1)].coord), &(mesh[current][index(ii, jj)].coord), 0.5);
-				if (dum2.value == 0.5)
+				cPoint dum2((mesh[current][index(ii, jj+1)].coord), (mesh[current][index(ii, jj)].coord), 0.5);
+				if (dum2[3] == 0.5)
 					surfaceNext.push_back(dum2);
 			}
-			cPoint dum3(&(mesh[current][index(ii + 1, j+1)].coord), &(mesh[current][index(ii, j+1)].coord), 0.5);
-			if (dum3.value == 0.5)
+			cPoint dum3((mesh[current][index(ii + 1, j+1)].coord), (mesh[current][index(ii, j+1)].coord), 0.5);
+			if (dum3[3] == 0.5)
 				surfaceNext.push_back(dum3);
 		}
 		for (int jj = j - 1; jj < j + 1; jj++)
 		{
-			cPoint dum(&(mesh[current][index(i + 1, jj+1)].coord), &(mesh[current][index(i+1, jj)].coord), 0.5);
-			if (dum.value == 0.5)
+			cPoint dum((mesh[current][index(i + 1, jj+1)].coord), (mesh[current][index(i+1, jj)].coord), 0.5);
+			if (dum[3] == 0.5)
 				surfaceNext.push_back(dum);
 		}
 
@@ -557,11 +557,12 @@ void LBMSolver::TimeStep(double t)
 
 		//CALCULATE CURVATURE AND NORMAL VECTOR AND STORE THE DATA IN THE CELL. 
 		//Calculate normal vector with the gradient of the filling. 
-		mesh[current][*it].n[0] = -(mesh[current][index(i, j + 1)].coord.value - mesh[current][*it].coord.value) / 1.0;
-		mesh[current][*it].n[1] = -(mesh[current][index(i+1, j)].coord.value - mesh[current][*it].coord.value) / 1.0;
-		double mod = sqrt(mesh[current][*it].n[0] * mesh[current][*it].n[0] + mesh[current][*it].n[1] * mesh[current][*it].n[1]);
-		mesh[current][*it].n[0] /= mod;
-		mesh[current][*it].n[1] /= mod;
+		mesh[current][*it].n[0] = -(mesh[current][index(i, j + 1)].coord[3] - mesh[current][*it].coord[3]) / 1.0;
+		mesh[current][*it].n[1] = -(mesh[current][index(i+1, j)].coord[3] - mesh[current][*it].coord[3]) / 1.0;
+		mesh[current][*it].n.normalize();
+		//double mod = sqrt(mesh[current][*it].n[0] * mesh[current][*it].n[0] + mesh[current][*it].n[1] * mesh[current][*it].n[1]);
+		//mesh[current][*it].n[0] /= mod;
+		//mesh[current][*it].n[1] /= mod;
 
 		//Append surfaceNext to the surface points list. (CHECK FOR THE REPEATED VALUES AND DO NOT APPEND THOSE)
 		freeSurface.splice(freeSurface.end(), surfaceNext);
@@ -681,7 +682,7 @@ void LBMSolver::Render()
 	glColor3f(0., 0.0, 0.);
 	glBegin(GL_POINTS);
 	for (std::list<cPoint>::const_iterator it = freeSurface.begin(); it != freeSurface.end(); ++it)
-		glVertex2f(it->x, it->y);
+		glVertex2f((*it)[0], (*it)[1]);
 	glEnd();
 	//Draw normal vectors
 	/*glColor3f(0., 1., 0.);
@@ -733,11 +734,11 @@ void LBMSolver::Render()
 
 LBMSolver::~LBMSolver()
 {
-	//if (mesh)
-	//{
-	//	delete mesh[0];
-	//	delete mesh[1];
-	//	delete mesh;
-	//}
+	if (mesh)
+	{
+		delete mesh[0];
+		delete mesh[1];
+		delete mesh;
+	}
 
 }

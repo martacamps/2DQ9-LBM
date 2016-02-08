@@ -19,6 +19,8 @@
 
 //Colour scale and numeric intervals for each colour
 
+//I HAVE TO REPROGRAM IT SO IT USES CPOINT!!!!!!!
+
 #pragma once
 
 class cColourGraph

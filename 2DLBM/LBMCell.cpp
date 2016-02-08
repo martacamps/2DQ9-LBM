@@ -21,13 +21,19 @@
 #include "stdafx.h"
 #include "LBMCell.h"
 
+LBMCell::LBMCell() :
+f({ { 4. / 9., 1. / 9., 1. / 9., 1. / 9., 1. / 9., 1. / 36., 1. / 36., 1. / 36., 1. / 36. } }),
+u({ { 0., 0. } })
+{
+}
+
 void LBMCell::InitFluid()
 {
 	mass = rho;
 	n[0] = 0.0;
 	n[1] = 0.0;
 	curvature = -1;
-	coord.value = 1;
+	coord[3] = 1;
 }
 
 void LBMCell::InitGas()
@@ -38,6 +44,6 @@ void LBMCell::InitGas()
 	n[0] = 0.0;
 	n[1] = 0.0;
 	curvature = -1;
-	coord.value = 0.0;
+	coord[3] = 0.0;
 }
 
