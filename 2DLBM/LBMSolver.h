@@ -28,7 +28,7 @@
 
 enum cellTag
 {
-	fluid, gas, interface, ifull, iempty, ifluid, igas, inew, slipbc, noslipbc
+	fluid, gas, interface, ifull, iempty, ifluid, igas, slipbc, noslipbc
 };
 
 
@@ -63,6 +63,7 @@ private:
 	int index(int i, int j) { return i*numCells + j; }        //To access the mesh array as it was a 2D matrix.
 	void separateIndex(int ij, int*i, int*j) {*i = ij / numCells; *j = ij - numCells*(*i);}
 	double Fequi(double ux, double uy, double rho, int l);    //equilibrium function
+	double MassExchange(int type, const std::vector<int>& cells);		//Performs the mass exchange for the ifull or iempty interface cells. Returns the excess mass that can't be asigned to the neighbouring interface cells. 
 	std::array<double, 2> g;			//acceleration of gravity
 	const std::array<double, 9> w;		//Weights
 	const std::array<int, 9> ex;        //x components of the velocity vectors

@@ -37,7 +37,6 @@ other(1)
 void LBMSolver::Create(double nu, double sig, double fx, double fy, double rho, double dx, double size, double time)
 {
 	cellSize = dx;
-	//lidSpeed = v;
 	
 	//Compute necessary information from input parameters
 	double gMag = sqrt(fx*fx + fy*fy);
@@ -239,6 +238,8 @@ void LBMSolver::TimeStep(double t)
 		}
 	}
 
+
+
 	//Mass update
 	std::list<int>::iterator it;
 	for (it = interfaceCells.begin(); it != interfaceCells.end(); ++it)
@@ -265,7 +266,7 @@ void LBMSolver::TimeStep(double t)
 					tempMass += mesh[current][next].f[inv] - mesh[current][ij].f[l];
 					break;
 				case interface:
-					tempMass += 0.5*(mesh[current][next].coord[3] + mesh[current][ij].coord[3]) * (mesh[current][next].f[inv] - mesh[current][ij].f[l]);
+					tempMass += 0.5*(mesh[other][next].coord[3] + mesh[other][ij].coord[3]) * (mesh[current][next].f[inv] - mesh[current][ij].f[l]);
 					break;
 				case ifluid:
 					if (n > 0)
@@ -354,161 +355,27 @@ void LBMSolver::TimeStep(double t)
 	//This loop is different from teh previous one because you have to mark the interface cells as iempty or ifull once all the mass have been 
 	//updated. If not, you would be changing the tags of the neighbour cells that are still updating its mass. 
 	std::list<int>::iterator sideIt;
+	std::vector<int> cellsEmpty, cellsFull;
 	for (it = interfaceCells.begin(); it != interfaceCells.end(); ++it)
 	{
 		if (mesh[current][*it].mass <= 0)
 		{
 			tags[*it] = iempty;
+			cellsEmpty.push_back(*it);
 		}
 			
 		if (mesh[current][*it].mass >= mesh[current][*it].rho)
 		{
 			tags[*it] = ifull;
+			cellsFull.push_back(*it);
 		}
 	}
 
-	//Prepare time step: Mass exchange 
-	//Done for the 'current' mesh. 
-	double excessMass = 0.0;
-	for (it = interfaceCells.begin(); it != interfaceCells.end(); ++it)
-	{
-		//Calculate the position of the cell to be able to search its neighbours. 
+    //Prepare time step: Mass exchange for empty interface cells
+    double excessMass = MassExchange(iempty, cellsEmpty);
 
-		int i, j;
-		separateIndex(*it, &i, &j);
-		int tag = tags[*it];
-		std::list<int> sideInterfaces;
-		double lackMass = 0.;
-		double extraMass = 0.0;
-
-		if (tags[*it] == ifull)
-		{
-			//Search its neighbours and count and change the surrounding cells to interface cells.
-			for (int l = 1; l < 9; l++)
-			{
-				int inv = finv[l];
-				int previous = index(i + ey[inv], j + ex[inv]);
-				int previous2 = index(i + 2 * ey[inv], j + 2 * ex[inv]);
-
-				switch (tags[previous])
-				{
-				//case interface :
-					//if ((l >= 1 && l <= 4) && ((tags[previous2] == fluid) || (tags[previous2] == noslipbc)))  // If the cell next to the interface is fluid or a wall, I have to fill the interface cell with fluid.
-					//{
-					//	tags[previous] = ifull;
-					//	lackMass += mesh[current][previous].rho - mesh[current][previous].mass;
-					//}
-					//else
-					//{
-						//sideInterfaces.push_back(previous);
-					//}
-					//break;
-				case inew:     // If it is an interface cell created this loop it has to be put in the side interfaces list to share the excess mass. 
-					sideInterfaces.push_back(previous);
-					break;
-				case gas:  
-					tags[previous] = inew;
-					//THE FOLLOWING LINE IS NOT EXACTLY RIGHT.
-					mesh[current][previous].f = mesh[current][*it].f;  //Copy the distribution functions from the filled interface cell. 
-					mesh[current][previous].mass = 0.0;
-					interfaceCells.push_back(previous);
-					sideInterfaces.push_back(previous);
-					break;
-				}
-			}
-		}
-		if (tags[*it] == iempty)
-		{ 
-			//Search its neighbours and count and change the surrounding cells to interface cells.
-			for (int l = 1; l < 9; l++)
-			{
-				int inv = finv[l];
-				int previous = index(i + ey[inv], j + ex[inv]);
-				int previous2 = index(i + 2 * ey[inv], j + 2 * ex[inv]);
-
-				switch (tags[previous])
-				{
-				//case interface :
-					//if ((l>=1 && l<=4) && ((tags[previous2] == gas) || (tags[previous2]==noslipbc)))  // If the cell next to the interface is fluid or a wall, I have to fill the interface cell with fluid.
-					//{
-					//    tags[previous] = iempty;
-					//	extraMass += mesh[current][previous].mass;
-					//}
-					//else
-					//{
-						//sideInterfaces.push_back(previous);
-					//}
-				//	break;
-				case inew:
-					sideInterfaces.push_back(previous);
-					break;
-				case fluid:  
-					tags[previous] = inew;
-					mesh[current][previous].mass = mesh[current][previous].rho;
-					interfaceCells.push_back(previous);
-					sideInterfaces.push_back(previous);
-					break;
-				}
-			}
-		}
-
-		//Calculate the extra mass and share it among the surrounding interface cells.
-		double mass = mesh[current][*it].mass;
-		if (mass<0 || mass > mesh[current][*it].rho)
-		{
-			//Calculate the extra mass for this cell
-			if (mass < 0)
-				extraMass += mass-lackMass;
-			else
-				extraMass += (mass - mesh[current][*it].rho)-lackMass;
-
-			//Share it between the surrounding interface cells or keep it to put it to all interface cells if there are no surrounding cells. 
-			int sideSize = sideInterfaces.size();
-			if (sideSize == 0)
-			{
-				excessMass += extraMass;
-			}
-			else
-			{
-				for (sideIt = sideInterfaces.begin(); sideIt != sideInterfaces.end(); ++sideIt)
-					mesh[current][*sideIt].mass += extraMass / (double)sideSize;
-			}
-		}
-	}
-
-	//Prepare timestep: Cell type update and remove cells from interface list.
-	std::list<int> notInterfaceCells;
-	for (it = interfaceCells.begin(); it != interfaceCells.end(); ++it)
-	{
-		switch (tags[*it])
-		{
-		case inew:
-			tags[*it] = interface;
-			break;
-		case ifull:
-			tags[*it] = fluid;
-			mesh[current][*it].InitFluid();
-			mesh[other][*it].InitFluid();
-			notInterfaceCells.push_back(*it);
-			break;
-		case iempty:
-			tags[*it] = gas;
-			notInterfaceCells.push_back(*it);
-			mesh[current][*it].InitGas();
-			//mesh[current][*it].rho = 1.0;
-			//mesh[current][*it].f = { { 4. / 9., 1. / 9., 1. / 9., 1. / 9., 1. / 9., 1. / 36., 1. / 36., 1. / 36., 1. / 36. } };
-			mesh[other][*it].InitGas();
-			//mesh[other][*it].rho = 1.0;
-			//mesh[other][*it].f = { { 4. / 9., 1. / 9., 1. / 9., 1. / 9., 1. / 9., 1. / 36., 1. / 36., 1. / 36., 1. / 36. } };
-			break;
-		}
-	}
-
-	//Prepare next timestep: remove the cells that are no longer interface from the interface list. 
-	for (it = notInterfaceCells.begin(); it != notInterfaceCells.end(); ++it)
-	{
-		interfaceCells.remove(*it);
-	}
+	//Prepare time step: Mass exchange for full interface cells
+	excessMass += MassExchange(ifull, cellsFull);
 
 	//Prepare timestep: If there is excess mass, distribuite it into all the interface cells. 
 	if (abs(excessMass) > 0)
@@ -596,7 +463,7 @@ void LBMSolver::TimeStep(double t)
 		else
 		{
 			std::string str("Interface cell surrounded only by interface cells!");
-			throw(str);  
+			//throw(str);  
 		}
 	}
 
@@ -610,6 +477,137 @@ double LBMSolver::Fequi(double ux, double uy, double rho, int l)
 {
 	double eDotu = ex[l] * ux + ey[l] * uy;
 	return w[l] * rho*(1 - (3.*(ux*ux + uy*uy)) / (2.*c*c) + (3.*eDotu) / c + (9.*eDotu*eDotu) / (2.*c*c));
+}
+
+double LBMSolver::MassExchange(int type, const std::vector<int>& cells)
+{
+	//Prepare time step: Mass exchange 
+	//Done for the 'current' mesh. 
+	//Create the new interface cells. Store the indices of the ifull / iempty and of its surrounding interface cells. 
+	//std::vector<int> fullEmpty;
+	std::vector<std::vector<int>> surrounding;
+	if (type == ifull)
+	{
+		for (auto it = cells.begin(); it !=cells.end(); ++it)
+		{
+			int i, j;
+			separateIndex(*it, &i, &j);
+			//int tag = tags[*it];
+			std::vector<int> sideInterfaces;
+
+			for (int l = 1; l < 9; l++)
+			{
+				int inv = finv[l];
+				int previous = index(i + ey[inv], j + ex[inv]);
+				//int previous2 = index(i + 2 * ey[inv], j + 2 * ex[inv]);
+
+				switch (tags[previous])
+				{
+				case interface:     
+					sideInterfaces.push_back(previous);
+					break;
+				case gas:
+					tags[previous] = interface;
+					//THE FOLLOWING LINE IS NOT EXACTLY RIGHT.
+					mesh[current][previous].f = mesh[current][*it].f;  //Copy the distribution functions from the filled interface cell. 
+					mesh[current][previous].rho = mesh[current][*it].rho; //Copy also the density, since it is directly related with the f. 
+					mesh[current][previous].mass = 0.0;
+					interfaceCells.push_back(previous);
+					sideInterfaces.push_back(previous);
+					break;
+				case iempty:
+					int ups = 1;
+					break;
+				}
+			}
+			surrounding.push_back(sideInterfaces);
+		}
+	}
+	else if (type == iempty)
+	{
+		for (auto it = cells.begin(); it != cells.end(); ++it)
+		{
+			int i, j;
+			separateIndex(*it, &i, &j);
+			//int tag = tags[*it];
+			std::vector<int> sideInterfaces;
+
+			for (int l = 1; l < 9; l++)
+			{
+				int inv = finv[l];
+				int previous = index(i + ey[inv], j + ex[inv]);
+				int previous2 = index(i + 2 * ey[inv], j + 2 * ex[inv]);
+
+				switch (tags[previous])
+				{
+				case interface:
+					sideInterfaces.push_back(previous);
+					break;
+				case fluid:
+					tags[previous] = interface;
+					mesh[current][previous].mass = mesh[current][previous].rho;
+					interfaceCells.push_back(previous);
+					sideInterfaces.push_back(previous);
+					break;
+				case ifull:
+					int upsfull = 1;
+					break;
+				}
+			}
+			surrounding.push_back(sideInterfaces);
+		}
+	}
+
+	//Calculate the extra mass and share it among the surrounding interface cells.
+	double excessMass = 0.0;
+	for (int i = 0; i < cells.size(); i++)
+	{
+		double extraMass = 0.0;
+		int cell = cells[i];
+		double mass = mesh[current][cell].mass;
+		//Calculate the extra mass for this cell
+		if (mass <= 0)
+			extraMass += mass;
+		else
+			extraMass += (mass - mesh[current][cell].rho);
+
+		//Share it between the surrounding interface cells or keep it to put it to all interface cells if there are no surrounding cells. 
+		int sideSize = surrounding[i].size();
+		if (sideSize == 0)
+		{
+			excessMass += extraMass;
+		}
+		else
+		{
+			for (int j = 0; j < surrounding[i].size(); j++)
+				mesh[current][surrounding[i][j]].mass += extraMass / (double)sideSize;
+		}
+	}
+
+	//Prepare timestep: Cell type update and remove cells from interface list.
+	//std::list<int> notInterfaceCells;
+	if (type == ifull)
+	{
+		for ( auto it = cells.begin(); it != cells.end(); ++it)
+		{
+			tags[*it] = fluid;
+			mesh[current][*it].InitFluid();
+			mesh[other][*it].InitFluid();
+			interfaceCells.remove(*it);
+		}
+	}
+	else if (type == iempty)
+	{
+		for (auto it = cells.begin(); it != cells.end(); ++it)
+		{
+			tags[*it] = gas;
+			mesh[current][*it].InitGas();
+			mesh[other][*it].InitGas();
+			interfaceCells.remove(*it);
+		}
+	}
+
+	return excessMass;
 }
 
 void LBMSolver::Render()
@@ -744,9 +742,7 @@ LBMSolver::~LBMSolver()
 {
 	if (mesh)
 	{
-		delete mesh[0];
-		delete mesh[1];
-		delete mesh;
+		delete[] mesh;
 	}
 
 }
