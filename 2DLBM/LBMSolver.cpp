@@ -435,9 +435,6 @@ void LBMSolver::TimeStep(double t)
 		mesh[current][*it].n[0] = -(mesh[current][index(i, j + 1)].coord[3] - mesh[current][*it].coord[3]) / 1.0;
 		mesh[current][*it].n[1] = -(mesh[current][index(i+1, j)].coord[3] - mesh[current][*it].coord[3]) / 1.0;
 		mesh[current][*it].n.normalize();
-		//double mod = sqrt(mesh[current][*it].n[0] * mesh[current][*it].n[0] + mesh[current][*it].n[1] * mesh[current][*it].n[1]);
-		//mesh[current][*it].n[0] /= mod;
-		//mesh[current][*it].n[1] /= mod;
 
 		//Append surfaceNext to the surface points list. (CHECK FOR THE REPEATED VALUES AND DO NOT APPEND THOSE)
 		freeSurface.splice(freeSurface.end(), surfaceNext);
@@ -486,14 +483,17 @@ double LBMSolver::MassExchange(int type, const std::vector<int>& cells)
 	//Create the new interface cells. Store the indices of the ifull / iempty and of its surrounding interface cells. 
 	//std::vector<int> fullEmpty;
 	std::vector<std::vector<int>> surrounding;
+	std::vector<int> newInterface;
 	if (type == ifull)
 	{
+		double rhoAv=0, numCells=0;
+		cPoint uAv;
 		for (auto it = cells.begin(); it !=cells.end(); ++it)
 		{
 			int i, j;
 			separateIndex(*it, &i, &j);
 			//int tag = tags[*it];
-			std::vector<int> sideInterfaces;
+			std::vector<int> sideInterfaces, newSideInterface;
 
 			for (int l = 1; l < 9; l++)
 			{
@@ -503,16 +503,20 @@ double LBMSolver::MassExchange(int type, const std::vector<int>& cells)
 
 				switch (tags[previous])
 				{
-				case interface:     
+				case fluid:
+					rhoAv += mesh[current][previous].rho;
+					uAv += mesh[current][previous].u;
+					numCells += 1;
+					break;
+				case interface: case igas: case ifluid:
+					rhoAv += mesh[current][previous].rho;
+					uAv += mesh[current][previous].u;
+					numCells += 1;
 					sideInterfaces.push_back(previous);
 					break;
 				case gas:
-					tags[previous] = interface;
-					//THE FOLLOWING LINE IS NOT EXACTLY RIGHT.
-					mesh[current][previous].f = mesh[current][*it].f;  //Copy the distribution functions from the filled interface cell. 
-					mesh[current][previous].rho = mesh[current][*it].rho; //Copy also the density, since it is directly related with the f. 
-					mesh[current][previous].mass = 0.0;
-					interfaceCells.push_back(previous);
+					tags[previous] = inew;
+					newSideInterface.push_back(previous);
 					sideInterfaces.push_back(previous);
 					break;
 				case iempty:
@@ -520,7 +524,31 @@ double LBMSolver::MassExchange(int type, const std::vector<int>& cells)
 					break;
 				}
 			}
+			//Initialize the new interface cells with the average velocity and density.
+			if (numCells > 0)
+			{
+				rhoAv /= numCells;
+				uAv *= 1.0 / numCells;
+				std::array<double, 9> newF;
+				for (int k = 0; k < 9; k++)
+					newF[k] = Fequi(uAv[0], uAv[1], rhoAv, k);
+				for (auto cell = newSideInterface.begin(); cell != newSideInterface.end(); ++cell)
+				{
+					mesh[current][*cell].rho = rhoAv;
+					mesh[current][*cell].u = uAv;
+					mesh[current][*cell].f = newF;
+				}
+			}
+			else                //If an interface cell is completelly surrounded by gas (THIS SHOULD NOT HAPPEN), just emty it.
+			{
+				tags[*it] = gas;
+				mesh[current][*it].InitGas();
+				mesh[other][*it].InitGas();
+				interfaceCells.remove(*it);
+			}	
 			surrounding.push_back(sideInterfaces);
+			interfaceCells.insert(interfaceCells.end(),newSideInterface.begin(),newSideInterface.end());
+			newInterface.insert(newInterface.end(), newSideInterface.begin(), newSideInterface.end());
 		}
 	}
 	else if (type == iempty)
@@ -540,7 +568,7 @@ double LBMSolver::MassExchange(int type, const std::vector<int>& cells)
 
 				switch (tags[previous])
 				{
-				case interface:
+				case interface: case igas: case ifluid:
 					sideInterfaces.push_back(previous);
 					break;
 				case fluid:
@@ -580,7 +608,7 @@ double LBMSolver::MassExchange(int type, const std::vector<int>& cells)
 		else
 		{
 			for (int j = 0; j < surrounding[i].size(); j++)
-				mesh[current][surrounding[i][j]].mass += extraMass / (double)sideSize;
+				mesh[current][surrounding[i][j]].mass += extraMass / (double)sideSize;  //I CAN'T SHARE THE MASS IN THE DIRECTION OF THE FLOW UNTIL I HAVE THE SURFACE NORMAL CALCULATED. 
 		}
 	}
 
@@ -595,6 +623,8 @@ double LBMSolver::MassExchange(int type, const std::vector<int>& cells)
 			mesh[other][*it].InitFluid();
 			interfaceCells.remove(*it);
 		}
+		for (auto it = newInterface.begin(); it != newInterface.end(); ++it)
+			tags[*it] = interface;
 	}
 	else if (type == iempty)
 	{
@@ -609,6 +639,7 @@ double LBMSolver::MassExchange(int type, const std::vector<int>& cells)
 
 	return excessMass;
 }
+
 
 void LBMSolver::Render()
 {
