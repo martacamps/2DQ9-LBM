@@ -358,13 +358,13 @@ void LBMSolver::TimeStep(double t)
 	std::vector<int> cellsEmpty, cellsFull;
 	for (it = interfaceCells.begin(); it != interfaceCells.end(); ++it)
 	{
-		if (mesh[current][*it].mass <= 0)
+		if (mesh[current][*it].mass <= -BUFFER)
 		{
 			tags[*it] = iempty;
 			cellsEmpty.push_back(*it);
 		}
 			
-		if (mesh[current][*it].mass >= mesh[current][*it].rho)
+		if ((mesh[current][*it].mass - mesh[current][*it].rho) >= BUFFER)
 		{
 			tags[*it] = ifull;
 			cellsFull.push_back(*it);

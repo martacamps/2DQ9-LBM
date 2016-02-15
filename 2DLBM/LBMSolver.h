@@ -26,6 +26,8 @@
 #include "cSolver.h"
 #include "cPoint.h"
 
+#define BUFFER 1e-3
+
 enum cellTag
 {
 	fluid, gas, interface, ifull, iempty, inew, ifluid, igas, slipbc, noslipbc
