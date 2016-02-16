@@ -44,6 +44,7 @@ void LBMSolver::Create(double nu, double sig, double fx, double fy, double rho, 
 		dt = sqrt((1e-4*cellSize) / sqrt(fx*fx + fy*fy));    // So the gravity acceleration in the model is not larger than 1e-4.
 	else
 		dt = cellSize;
+	//dt = cellSize;
 	g[0] = fx*(dt*dt) / cellSize;
 	g[1] = fy*(dt*dt) / cellSize;
 	c = cellSize/dt;
@@ -59,7 +60,6 @@ void LBMSolver::Create(double nu, double sig, double fx, double fy, double rho, 
 	}
 	double dm = rho*cellSize*cellSize*cellSize;
 	sigma = sig*(dt*dt) / dm;
-	//p = 101300 * (dm / (cellSize*dt*dt));
 
 	numCells = (int)std::round(size / cellSize);
 	numSteps = (int)std::round(time / dt);
@@ -629,8 +629,12 @@ void LBMSolver::SurfaceNormal(int ij)
 {
 	int i, j;
 	separateIndex(ij, &i, &j);
-	mesh[current][ij].n[0] = 0.5* (mesh[current][index(i - 1, j)].coord[3] - mesh[current][index(i + 1, j)].coord[3]);
-	mesh[current][ij].n[1] = 0.5* (mesh[current][index(i, j - 1)].coord[3] - mesh[current][index(i, j + 1)].coord[3]);
+	//Nils formula shifts the normals 90deg. 
+	//mesh[current][ij].n[0] = 0.5* (mesh[current][index(i - 1, j)].coord[3] - mesh[current][index(i + 1, j)].coord[3]);
+	//mesh[current][ij].n[1] = 0.5* (mesh[current][index(i, j - 1)].coord[3] - mesh[current][index(i, j + 1)].coord[3]);
+	mesh[current][ij].n[0] = -(mesh[current][index(i, j + 1)].coord[3] - mesh[current][ij].coord[3]) / 1.0;
+	mesh[current][ij].n[1] = -(mesh[current][index(i + 1, j)].coord[3] - mesh[current][ij].coord[3]) / 1.0;
+	mesh[current][ij].n.normalize();
 }
 
 
@@ -714,15 +718,16 @@ void LBMSolver::Render()
 	for (std::list<cPoint>::const_iterator it = freeSurface.begin(); it != freeSurface.end(); ++it)
 		glVertex2f((*it)[0], (*it)[1]);
 	glEnd();
+
 	//Draw normal vectors
-	/*glColor3f(0., 1., 0.);
+	glColor3f(0., 1., 0.);
 	glBegin(GL_LINES);
 	for (std::list<int>::const_iterator it = interfaceCells.begin(); it != interfaceCells.end(); ++it)
 	{
-		glVertex2f(mesh[other][*it].coord.x, mesh[other][*it].coord.y);
-		glVertex2f(mesh[other][*it].coord.x + mesh[other][*it].n[0], mesh[other][*it].coord.y+ mesh[other][*it].n[1]);
+		glVertex2f(mesh[other][*it].coord[0], mesh[other][*it].coord[1]);
+		glVertex2f(mesh[other][*it].coord[0] + mesh[other][*it].n[0], mesh[other][*it].coord[1]+ mesh[other][*it].n[1]);
 	}
-	glEnd();*/
+	glEnd();
 
 
 	//Draw cell velocity vectors
