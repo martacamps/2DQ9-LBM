@@ -158,6 +158,15 @@ void LBMSolver::TimeStep(double t)
 
 			if (tags[ij] != gas)
 			{
+				
+				if (tags[ij] == interface)
+				{
+					//Mass exchange
+					MassExchange(ij);
+					//Calculate normal
+					SurfaceNormal(ij);
+				}
+					
 				//Streaming
 				if (tags[ij] == fluid)
 				{
@@ -188,9 +197,17 @@ void LBMSolver::TimeStep(double t)
 						//check the type of the neighbour cell and perform streaming. //I COULD DO THIS WITH A FOREACH IF I PUT THE LINES OF CODE INTO A FUNCTION (MAYBE IT IS MORE EFFICIENT)
 						if (tags[previous] == gas) //Surface reconstruction and apply surface forces
 						{
+							//I HAVE TO DO A RECONSTRUCT INTERFACE FUNCTION. 
 							f0inv = Fequi(mesh[other][ij].u[0], mesh[other][ij].u[1], 1.0, inv);
 							f0 = Fequi(mesh[other][ij].u[0], mesh[other][ij].u[1], 1.0, l); //NOTE: IT IS USING THE VELOCITY MODIFIED BY 0.5*GRAVITY, NOT THE ONE USED FOR COLISION. 
 							mesh[current][ij].f[l] = f0inv + f0 - mesh[other][ij].f[l];    //Surface reconstruction. FALTA LA SURFACE TENSION I LA PRESSURE. 
+						}
+						else if ((tags[ij]==interface) && ( (mesh[current][ij].n*cPoint(ex[inv],ey[inv],0.0,0.0 ) ) > 0))
+						{
+							//I HAVE TO DO A RECONSTRUCT INTERFACE FUNCTION. 
+							f0inv = Fequi(mesh[other][ij].u[0], mesh[other][ij].u[1], 1.0, inv);
+							f0 = Fequi(mesh[other][ij].u[0], mesh[other][ij].u[1], 1.0, l); //NOTE: IT IS USING THE VELOCITY MODIFIED BY 0.5*GRAVITY, NOT THE ONE USED FOR COLISION. 
+							mesh[current][ij].f[l] = f0inv + f0 - mesh[other][ij].f[l];
 						}
 						else if (tags[previous] == noslipbc) //The neighbour cell is a non slip wall
 						{
@@ -219,6 +236,7 @@ void LBMSolver::TimeStep(double t)
 				mesh[current][ij].rho = rho;
 				mesh[current][ij].u[0] = ux;
 				mesh[current][ij].u[1] = uy;
+				mesh[current][ij].UpdateFill();
 
 				//Collision: apply gravity
 				ux += tau*g[0];
@@ -232,129 +250,17 @@ void LBMSolver::TimeStep(double t)
 				}
 
 				//Collision: Calculate velocities for display and particle tracing. 
-				mesh[current][ij].u[0] += 0.5*tau*g[0];
-				mesh[current][ij].u[1] += 0.5*tau*g[1];
+				//mesh[current][ij].u[0] += 0.5*tau*g[0];
+				//mesh[current][ij].u[1] += 0.5*tau*g[1];
 			}
 		}
 	}
 
-
-
-	//Mass update
-	std::list<int>::iterator it;
-	for (it = interfaceCells.begin(); it != interfaceCells.end(); ++it)
-	{
-		int i, j,ij;
-		ij = *it;
-		separateIndex(ij, &i, &j);
-
-		tempMass = 0.0;
-		switch (tags[ij])
-		{
-		case interface :
-			for (int l = 1; l < 9; l++)
-			{
-				int next = index(i + ey[l], j + ex[l]);
-				int inv = finv[l];
-				//Mean normal vector
-				double nx = (mesh[other][ij].n[0] + mesh[other][next].n[0])*0.5;
-				double ny = (mesh[other][ij].n[1] + mesh[other][next].n[1])*0.5;
-				double n = (ex[l] * nx + ey[l] * ny) / modE[l];
-				switch (tags[next])
-				{
-				case fluid:
-					tempMass += mesh[current][next].f[inv] - mesh[current][ij].f[l];
-					break;
-				case interface:
-					tempMass += 0.5*(mesh[other][next].coord[3] + mesh[other][ij].coord[3]) * (mesh[current][next].f[inv] - mesh[current][ij].f[l]);
-					break;
-				case ifluid:
-					if (n > 0)
-						tempMass += n*mesh[other][next].coord[3]*mesh[current][next].f[inv];
-					break;
-				case igas:
-					if (n < 0)
-						tempMass -= n*(1. - mesh[other][next].coord[3])*mesh[current][ij].f[l];
-					break;
-				}
-			}
-			mesh[current][ij].mass = mesh[other][ij].mass + tempMass;
-			break;
-		case ifluid :
-			for (int l = 1; l < 9; l++)
-			{
-				int next = index(i + ey[l], j + ex[l]);
-				int inv = finv[l];
-				//Mean normal vector
-				double nx = (mesh[other][ij].n[0] + mesh[other][next].n[0])*0.5;
-				double ny = (mesh[other][ij].n[1] + mesh[other][next].n[1])*0.5;
-				double n = (ex[l] * nx + ey[l] * ny) / modE[l];
-				switch (tags[next])
-				{
-				case fluid:
-					tempMass += mesh[current][next].f[inv] - mesh[current][ij].f[l];
-					break;
-				case interface :
-					if (n < 0)
-						tempMass -= n*mesh[other][ij].coord[3]*mesh[current][ij].f[l];
-					break;
-				case ifluid:
-					if (n <= 0)
-						tempMass -= mesh[other][ij].coord[3]*mesh[current][ij].f[l];
-					else
-						tempMass += mesh[other][next].coord[3]*mesh[current][next].f[inv];
-					break;
-				case igas:
-					if (n <= 0)
-						tempMass -= (1 - mesh[other][next].coord[3])*mesh[current][ij].f[l];
-					else
-						tempMass += (1 - mesh[other][ij].coord[3])*mesh[current][next].f[inv];
-					break;
-				}
-			}
-			mesh[current][ij].mass = mesh[other][ij].mass + tempMass;
-			break;
-		case igas:
-			for (int l = 1; l < 9; l++)
-			{
-				int next = index(i + ey[l], j + ex[l]);
-				int inv = finv[l];
-				//Mean normal vector
-				double nx = (mesh[other][ij].n[0] + mesh[other][next].n[0])*0.5;
-				double ny = (mesh[other][ij].n[1] + mesh[other][next].n[1])*0.5;
-				double n = (ex[l] * nx + ey[l] * ny) / modE[l];
-				switch (tags[next])
-				{
-				case fluid:
-					tempMass += mesh[current][next].f[inv] - mesh[current][ij].f[l];
-					break;
-				case interface :
-					if (n > 0)
-						tempMass += n*(1-mesh[other][ij].coord[3])*mesh[current][next].f[inv];
-					break;
-				case ifluid:
-					if (n <= 0)
-						tempMass -= mesh[other][ij].coord[3]*mesh[current][ij].f[l];
-					else
-						tempMass += mesh[other][next].coord[3]*mesh[current][next].f[inv];
-					break;
-				case igas:
-					if (n <= 0)
-						tempMass -= (1 - mesh[other][next].coord[3])*mesh[current][ij].f[l];
-					else
-						tempMass += (1 - mesh[other][ij].coord[3])*mesh[current][next].f[inv];
-					break;
-				}
-			}
-			mesh[current][ij].mass = mesh[other][ij].mass + tempMass;
-			break;
-		}
-	}
 
 	//Prepare time step: Mark the interface cells that are empty or full
 	//This loop is different from teh previous one because you have to mark the interface cells as iempty or ifull once all the mass have been 
 	//updated. If not, you would be changing the tags of the neighbour cells that are still updating its mass. 
-	std::list<int>::iterator sideIt;
+	std::list<int>::iterator sideIt,it;
 	std::vector<int> cellsEmpty, cellsFull;
 	for (it = interfaceCells.begin(); it != interfaceCells.end(); ++it)
 	{
@@ -371,11 +277,11 @@ void LBMSolver::TimeStep(double t)
 		}
 	}
 
-    //Prepare time step: Mass exchange for empty interface cells
-    double excessMass = MassExchange(iempty, cellsEmpty);
+    //Prepare time step: Update interface and distribute excess mass for empty interface cells
+    double excessMass = MassDistribute(iempty, cellsEmpty);
 
-	//Prepare time step: Mass exchange for full interface cells
-	excessMass += MassExchange(ifull, cellsFull);
+	//Prepare time step: Update interface and distribute excess mass for full interface cells
+	excessMass += MassDistribute(ifull, cellsFull);
 
 	//Prepare timestep: If there is excess mass, distribuite it into all the interface cells. 
 	if (abs(excessMass) > 0)
@@ -432,9 +338,9 @@ void LBMSolver::TimeStep(double t)
 
 		//CALCULATE CURVATURE AND NORMAL VECTOR AND STORE THE DATA IN THE CELL. 
 		//Calculate normal vector with the gradient of the filling. 
-		mesh[current][*it].n[0] = -(mesh[current][index(i, j + 1)].coord[3] - mesh[current][*it].coord[3]) / 1.0;
-		mesh[current][*it].n[1] = -(mesh[current][index(i+1, j)].coord[3] - mesh[current][*it].coord[3]) / 1.0;
-		mesh[current][*it].n.normalize();
+		//mesh[current][*it].n[0] = -(mesh[current][index(i, j + 1)].coord[3] - mesh[current][*it].coord[3]) / 1.0;
+		//mesh[current][*it].n[1] = -(mesh[current][index(i+1, j)].coord[3] - mesh[current][*it].coord[3]) / 1.0;
+		//mesh[current][*it].n.normalize();
 
 		//Append surfaceNext to the surface points list. (CHECK FOR THE REPEATED VALUES AND DO NOT APPEND THOSE)
 		freeSurface.splice(freeSurface.end(), surfaceNext);
@@ -476,7 +382,7 @@ double LBMSolver::Fequi(double ux, double uy, double rho, int l)
 	return w[l] * rho*(1 - (3.*(ux*ux + uy*uy)) / (2.*c*c) + (3.*eDotu) / c + (9.*eDotu*eDotu) / (2.*c*c));
 }
 
-double LBMSolver::MassExchange(int type, const std::vector<int>& cells)
+double LBMSolver::MassDistribute(int type, const std::vector<int>& cells)
 {
 	//Prepare time step: Mass exchange 
 	//Done for the 'current' mesh. 
@@ -640,6 +546,93 @@ double LBMSolver::MassExchange(int type, const std::vector<int>& cells)
 	return excessMass;
 }
 
+void LBMSolver::MassExchange(int ij)
+{
+	int i, j;
+	separateIndex(ij, &i, &j);
+	float tempMass = 0.0;
+	switch (tags[ij])
+	{
+	case interface :
+		for (int l = 1; l < 9; l++)
+		{
+			int next = index(i + ey[l], j + ex[l]);
+			int inv = finv[l];
+			double meanE = 0.5*(mesh[other][next].coord[3] + mesh[other][ij].coord[3]);
+			switch (tags[next])
+			{
+			case fluid:
+				tempMass += mesh[other][next].f[inv] - mesh[other][ij].f[l];
+				break;
+			case interface:
+				tempMass += meanE * (mesh[other][next].f[inv] - mesh[other][ij].f[l]);
+				break;
+			case ifluid:
+				tempMass += -meanE * mesh[other][ij].f[l];
+				break;
+			case igas:
+				tempMass += meanE * mesh[other][next].f[inv];
+				break;
+			}
+		}
+		mesh[current][ij].mass = mesh[other][ij].mass + tempMass;
+		break;
+	case ifluid :
+		for (int l = 1; l < 9; l++)
+		{
+			int next = index(i + ey[l], j + ex[l]);
+			int inv = finv[l];
+			double meanE = 0.5*(mesh[other][next].coord[3] + mesh[other][ij].coord[3]);
+			switch (tags[next])
+			{
+			case fluid:
+				tempMass += mesh[other][next].f[inv] - mesh[other][ij].f[l];
+				break;
+			case interface: case igas:
+				tempMass += meanE * mesh[other][next].f[inv];
+				break;
+			case ifluid:
+				tempMass += meanE * (mesh[other][next].f[inv] - mesh[other][ij].f[l]);
+				break;
+			}
+		}
+		mesh[current][ij].mass = mesh[other][ij].mass + tempMass;
+		break;
+	case igas:
+		for (int l = 1; l < 9; l++)
+		{
+			int next = index(i + ey[l], j + ex[l]);
+			int inv = finv[l];
+			double meanE = 0.5*(mesh[other][next].coord[3] + mesh[other][ij].coord[3]);
+			switch (tags[next])
+			{
+			case fluid:
+				tempMass += mesh[current][next].f[inv] - mesh[current][ij].f[l];
+				break;
+			case interface: case ifluid:
+				tempMass += -meanE * mesh[other][ij].f[l];
+				break;
+			case igas:
+				tempMass += meanE * (mesh[other][next].f[inv] - mesh[other][ij].f[l]);
+				break;
+			}
+		}
+		mesh[current][ij].mass = mesh[other][ij].mass + tempMass;
+		break;
+	}
+
+	//Update fill level. 
+	mesh[current][ij].UpdateFill();
+}
+
+void LBMSolver::SurfaceNormal(int ij)
+{
+	int i, j;
+	separateIndex(ij, &i, &j);
+	mesh[current][ij].n[0] = 0.5* (mesh[current][index(i - 1, j)].coord[3] - mesh[current][index(i + 1, j)].coord[3]);
+	mesh[current][ij].n[1] = 0.5* (mesh[current][index(i, j - 1)].coord[3] - mesh[current][index(i, j + 1)].coord[3]);
+}
+
 
 void LBMSolver::Render()
 {
@@ -654,7 +647,7 @@ void LBMSolver::Render()
 	std::string title;
 	if (vis[2])  //Colours by velocity
 	{
-		double maxSpeed = 0.001;
+		double maxSpeed = 0.01;
 		for (int i = 0; i < 6; i++)
 			intervals.push_back(i*maxSpeed / 5.0);
 		colourScale.SetIntervals(&intervals);
@@ -689,8 +682,8 @@ void LBMSolver::Render()
 		glBegin(GL_TRIANGLE_STRIP);
 		for (int j = 0; j < numCells; j++)
 		{
-			ux.push_back(mesh[other][index(i, j)].u[0] / c);
-			uy.push_back(mesh[other][index(i, j)].u[1] / c);
+			ux.push_back((mesh[other][index(i, j)].u[0]/*+0.5*tau*g[0]*/) / c);      //I ADDED THE MEAN VELOCITY TAKING  GRAVITY INTO ACCOUNT
+			uy.push_back((mesh[other][index(i, j)].u[1] /*+0.5*tau*g[1]*/) / c);
 			mod.push_back(sqrt(ux.back()*ux.back() + uy.back()*uy.back()));
 			if (vis[2])	 //Colours by velocity
 			{
@@ -777,3 +770,116 @@ LBMSolver::~LBMSolver()
 	}
 
 }
+
+
+//OLD MASS EXCHANGE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+//Mass update
+//std::list<int>::iterator it;
+//for (it = interfaceCells.begin(); it != interfaceCells.end(); ++it)
+//{
+//	int i, j,ij;
+//	ij = *it;
+//	separateIndex(ij, &i, &j);
+
+//	tempMass = 0.0;
+//	switch (tags[ij])
+//	{
+//	case interface :
+//		for (int l = 1; l < 9; l++)
+//		{
+//			int next = index(i + ey[l], j + ex[l]);
+//			int inv = finv[l];
+//			//Mean normal vector
+//			double nx = (mesh[other][ij].n[0] + mesh[other][next].n[0])*0.5;
+//			double ny = (mesh[other][ij].n[1] + mesh[other][next].n[1])*0.5;
+//			double n = (ex[l] * nx + ey[l] * ny) / modE[l];
+//			switch (tags[next])
+//			{
+//			case fluid:
+//				tempMass += mesh[current][next].f[inv] - mesh[current][ij].f[l];
+//				break;
+//			case interface:
+//				tempMass += 0.5*(mesh[other][next].coord[3] + mesh[other][ij].coord[3]) * (mesh[current][next].f[inv] - mesh[current][ij].f[l]);
+//				break;
+//			case ifluid:
+//				if (n > 0)
+//					tempMass += n*mesh[other][next].coord[3]*mesh[current][next].f[inv];
+//				break;
+//			case igas:
+//				if (n < 0)
+//					tempMass -= n*(1. - mesh[other][next].coord[3])*mesh[current][ij].f[l];
+//				break;
+//			}
+//		}
+//		mesh[current][ij].mass = mesh[other][ij].mass + tempMass;
+//		break;
+//	case ifluid :
+//		for (int l = 1; l < 9; l++)
+//		{
+//			int next = index(i + ey[l], j + ex[l]);
+//			int inv = finv[l];
+//			//Mean normal vector
+//			double nx = (mesh[other][ij].n[0] + mesh[other][next].n[0])*0.5;
+//			double ny = (mesh[other][ij].n[1] + mesh[other][next].n[1])*0.5;
+//			double n = (ex[l] * nx + ey[l] * ny) / modE[l];
+//			switch (tags[next])
+//			{
+//			case fluid:
+//				tempMass += mesh[current][next].f[inv] - mesh[current][ij].f[l];
+//				break;
+//			case interface :
+//				if (n < 0)
+//					tempMass -= n*mesh[other][ij].coord[3]*mesh[current][ij].f[l];
+//				break;
+//			case ifluid:
+//				if (n <= 0)
+//					tempMass -= mesh[other][ij].coord[3]*mesh[current][ij].f[l];
+//				else
+//					tempMass += mesh[other][next].coord[3]*mesh[current][next].f[inv];
+//				break;
+//			case igas:
+//				if (n <= 0)
+//					tempMass -= (1 - mesh[other][next].coord[3])*mesh[current][ij].f[l];
+//				else
+//					tempMass += (1 - mesh[other][ij].coord[3])*mesh[current][next].f[inv];
+//				break;
+//			}
+//		}
+//		mesh[current][ij].mass = mesh[other][ij].mass + tempMass;
+//		break;
+//	case igas:
+//		for (int l = 1; l < 9; l++)
+//		{
+//			int next = index(i + ey[l], j + ex[l]);
+//			int inv = finv[l];
+//			//Mean normal vector
+//			double nx = (mesh[other][ij].n[0] + mesh[other][next].n[0])*0.5;
+//			double ny = (mesh[other][ij].n[1] + mesh[other][next].n[1])*0.5;
+//			double n = (ex[l] * nx + ey[l] * ny) / modE[l];
+//			switch (tags[next])
+//			{
+//			case fluid:
+//				tempMass += mesh[current][next].f[inv] - mesh[current][ij].f[l];
+//				break;
+//			case interface :
+//				if (n > 0)
+//					tempMass += n*(1-mesh[other][ij].coord[3])*mesh[current][next].f[inv];
+//				break;
+//			case ifluid:
+//				if (n <= 0)
+//					tempMass -= mesh[other][ij].coord[3]*mesh[current][ij].f[l];
+//				else
+//					tempMass += mesh[other][next].coord[3]*mesh[current][next].f[inv];
+//				break;
+//			case igas:
+//				if (n <= 0)
+//					tempMass -= (1 - mesh[other][next].coord[3])*mesh[current][ij].f[l];
+//				else
+//					tempMass += (1 - mesh[other][ij].coord[3])*mesh[current][next].f[inv];
+//				break;
+//			}
+//		}
+//		mesh[current][ij].mass = mesh[other][ij].mass + tempMass;
+//		break;
+//	}
+//}

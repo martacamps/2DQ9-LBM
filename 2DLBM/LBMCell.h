@@ -42,5 +42,5 @@ struct LBMCell
 
 	void InitFluid();         //Initialize the cell as fluid
 	void InitGas();			  //Initialize the cell as gas
-
+	void UpdateFill();        //Calculates the fill level for the cell 
 }; 

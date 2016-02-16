@@ -46,3 +46,8 @@ void LBMCell::InitGas()
 	coord[3] = 0.0;
 }
 
+void LBMCell::UpdateFill()
+{
+	coord[3] = mass / rho;
+}
+
