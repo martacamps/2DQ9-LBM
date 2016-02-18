@@ -18,7 +18,9 @@
 //3. This notice may not be removed or altered from any source distribution.
 
 #include "stdafx.h"
+#include "cMatrix2D.h"
 #include "LBMSolver.h"
+
 
 #define sqrt2 1.4142135623730950488
 
@@ -41,7 +43,7 @@ void LBMSolver::Create(double nu, double sig, double fx, double fy, double rho, 
 	//Compute necessary information from input parameters
 	double gMag = sqrt(fx*fx + fy*fy);
 	if (gMag > 0)
-		dt = sqrt((1e-4*cellSize) / sqrt(fx*fx + fy*fy));    // So the gravity acceleration in the model is not larger than 1e-4.
+		dt = sqrt((0.005*cellSize) / gMag);    // So the gravity acceleration in the model is not larger than 1e-4.
 	else
 		dt = cellSize;
 	//dt = cellSize;
@@ -147,7 +149,7 @@ void LBMSolver::InitialField()
 void LBMSolver::TimeStep(double t)
 {
 	//TimeStep
-	double f0, f0inv,tempMass;
+	double f0, f0inv;
 
 	int ue = 0;
 	for (int i = 1; i < numCells-1; i++)
@@ -238,15 +240,25 @@ void LBMSolver::TimeStep(double t)
 				mesh[current][ij].u[1] = uy;
 				mesh[current][ij].UpdateFill();
 
+				//Collision: Turbulence model. Obtain the modified tau, ts
+				double ts = stableTs(ij);
+
 				//Collision: apply gravity
 				ux += tau*g[0];
 				uy += tau*g[1];
+
+				//Collision update equilibrium distribution functions (feq). 
+				for (int l = 0; l < finv.size(); ++l)
+					mesh[current][ij].feq[l] = Fequi(ux, uy, rho, l);
+
+				//Collision: apply turbulence model: calculate turbulent viscosity and modify the relaxation time accordingly
+
 
 				//Collision
 				for (int l = 0; l < finv.size(); l++)
 				{
 					double f0 = Fequi(ux, uy, rho, l);
-					mesh[current][ij].f[l] = mesh[current][ij].f[l] - (1 / tau)*(mesh[current][ij].f[l] - f0);
+					mesh[current][ij].f[l] = mesh[current][ij].f[l] - (1 / tau)*(mesh[current][ij].f[l] - mesh[current][ij].feq[l]);
 				}
 
 				//Collision: Calculate velocities for display and particle tracing. 
@@ -342,7 +354,7 @@ void LBMSolver::TimeStep(double t)
 		//mesh[current][*it].n[1] = -(mesh[current][index(i+1, j)].coord[3] - mesh[current][*it].coord[3]) / 1.0;
 		//mesh[current][*it].n.normalize();
 
-		//Append surfaceNext to the surface points list. (CHECK FOR THE REPEATED VALUES AND DO NOT APPEND THOSE)
+		//Append surfaceNext to the surface points list. (CHECK FOR THE REPEATED VALUES AND DO NOT APPEND THOSE).LOOK AT STD::SET_DIFFERENCE
 		freeSurface.splice(freeSurface.end(), surfaceNext);
 
 		//Update the tag of the interface cell: interface, ifluid, igas
@@ -435,7 +447,7 @@ double LBMSolver::MassDistribute(int type, const std::vector<int>& cells)
 			{
 				rhoAv /= numCells;
 				uAv *= 1.0 / numCells;
-				std::array<double, 9> newF;
+				std::valarray<double> newF(9);
 				for (int k = 0; k < 9; k++)
 					newF[k] = Fequi(uAv[0], uAv[1], rhoAv, k);
 				for (auto cell = newSideInterface.begin(); cell != newSideInterface.end(); ++cell)
@@ -637,6 +649,21 @@ void LBMSolver::SurfaceNormal(int ij)
 	mesh[current][ij].n.normalize();
 }
 
+double LBMSolver::stableTs(int ij)
+{
+	//Calculate the modified relaxation time by introducing the turbulent viscosity of the Smagorinsky sub-grid turbulence model. See NilsThuereyDissertation.pdf
+	cMatrix2D<double> nonEquiStress(2,2);
+	std::valarray<double> fnonEqui = mesh[current][ij].f;
+	
+
+	//double ts = test%test;
+
+	double ts=1;
+
+	return ts;
+
+}
+
 
 void LBMSolver::Render()
 {
@@ -651,7 +678,7 @@ void LBMSolver::Render()
 	std::string title;
 	if (vis[2])  //Colours by velocity
 	{
-		double maxSpeed = 0.01;
+		double maxSpeed = 1.0;
 		for (int i = 0; i < 6; i++)
 			intervals.push_back(i*maxSpeed / 5.0);
 		colourScale.SetIntervals(&intervals);

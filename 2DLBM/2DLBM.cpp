@@ -118,8 +118,8 @@ int main(int argc, char* argv[])
 			cavity.Create(1e-6, 7e-4, 0, -9.81, 1000, 0.000006, 0.0005, 150);   //Re 250 
 			break;
 		case 2:
-			cavity.Create(1e-6, 7e-4, 0, -9.81, 1000, 0.000005, 0.0001, 150);   //Re 100 coarse
-			//cavity.Create(1e-4, 7e-4, 0., -9.81, 1000, 0.0005, 0.01, 150);   //Re 100 coarse
+			//cavity.Create(1e-6, 7e-4, 0, -9.81, 1000, 0.000005, 0.0001, 150);   //Re 100 coarse
+			cavity.Create(2e-4, 7e-4, 0., -9.81, 1000, 0.0005, 0.1, 150);   //Re 100 coarse
 			break;
 		case 3:
 			cavity.Create(1e-6, 7e-4, 4.5, -4.5, 1000, 0.000004, 0.0004, 150);   //Re 100 fine

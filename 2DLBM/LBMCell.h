@@ -23,10 +23,6 @@
 #pragma once
 #include "cPoint.h"
 
-//enum cellTag
-//{
-//	fluid, gas, interface, ifull, iempty, slipbc, noslipbc
-//};
 
 struct LBMCell
 {
@@ -35,7 +31,8 @@ struct LBMCell
 	double mass = 0;           //cell mass
 	double rho = 1;            //cell density
 	cPoint u;				   //cell velocity
-	std::array<double, 9> f;   //particle distribution functions
+	std::valarray<double> f;   //particle distribution functions
+	std::valarray<double> feq; //equilibrium particle distribution functions
 	cPoint n;				   //normal vector to the free surface
 	double curvature;		   //curvature of the free surface.
 	cPoint coord;              //Coordinates of the cell in the mesh. It also stores its fill level. 

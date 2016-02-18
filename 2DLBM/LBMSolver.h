@@ -26,6 +26,7 @@
 #include "cSolver.h"
 #include "cPoint.h"
 
+
 #define BUFFER 1e-2
 
 enum cellTag
@@ -68,12 +69,13 @@ private:
 	double MassDistribute(int type, const std::vector<int>& cells);		//Performs the mass exchange for the ifull or iempty interface cells. Returns the excess mass that can't be asigned to the neighbouring interface cells. 
 	void MassExchange(int ij);          //Mass exchange process for one cell
 	void SurfaceNormal(int ij);			//Update the normal vector of cell ij with the normal to the surface using the gradient of the filling, approximated by central diferences. 
+	double stableTs(int ij);			//Calculate a modified relaxation time for each cell by using the Smagorinsky sub-grid turbulence model
 	std::array<double, 2> g;			//acceleration of gravity
-	const std::array<double, 9> w;		//Weights
-	const std::array<int, 9> ex;        //x components of the velocity vectors
-	const std::array<int, 9> ey;        //y components of the velocity vectors
-	const std::array<double, 9> modE;   //Modulus of each direction vector e. 
-	const std::array<int, 9> finv;      //Index of the velocity vector pointing in the opposite direction for each of the 9 velocity vectors. 
+	const std::valarray<double> w;		//Weights
+	const std::valarray<int> ex;        //x components of the velocity vectors
+	const std::valarray<int> ey;        //y components of the velocity vectors
+	const std::valarray<double> modE;   //Modulus of each direction vector e. 
+	const std::valarray<int> finv;      //Index of the velocity vector pointing in the opposite direction for each of the 9 velocity vectors. 
 	std::list<int> changeTag;           //List of the cells that are going to change tag at the begining of the next step
 	std::list<int> interfaceCells;      //List of the cells in the interface. 
 	std::list<cPoint> freeSurface;		//List with points on the free surface

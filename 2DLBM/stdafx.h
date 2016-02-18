@@ -35,7 +35,9 @@
 #include <sstream>
 #include <iomanip>
 #include <list>
+#include <valarray>
 #include "glut.h"
+
 
 
 
