@@ -28,6 +28,8 @@ LBMSolver::LBMSolver() :
 w({ { 4. / 9., 1. / 9., 1. / 9., 1. / 9., 1. / 9., 1. / 36., 1. / 36., 1. / 36., 1. / 36. } }),
 ex({ { 0, 1, -1, 0, 0, 1, -1, 1, -1 } }),
 ey({ { 0, 0, 0, 1, -1, -1, -1, 1, 1 } }),
+exMod({ { 0, 1, -1, 0, 0, 1, -1, 1, -1 } }),
+eyMod({ { 0, 0, 0, 1, -1, -1, -1, 1, 1 } }),
 modE({ {0, 1,1,1,1, sqrt2, sqrt2, sqrt2, sqrt2} }),
 finv({ { 0, 2, 1, 4, 3, 8, 7, 6, 5 } }),
 current(0),
@@ -49,7 +51,10 @@ void LBMSolver::Create(double nu, double sig, double fx, double fy, double rho, 
 	//dt = cellSize;
 	g[0] = fx*(dt*dt) / cellSize;
 	g[1] = fy*(dt*dt) / cellSize;
+
 	c = cellSize/dt;
+	exMod = c*exMod;
+	eyMod = c*eyMod;
 
 	double nuStar = nu*(dt / (cellSize*cellSize));
 	tau = (6 * nuStar + 1) / 2;
@@ -225,15 +230,18 @@ void LBMSolver::TimeStep(double t)
 			    //Collision: calculate cell density and velocity
 				double rho = 0.0, ux = 0.0, uy = 0.0;
 				double fi;
+
 				for (int l = 0; l < finv.size(); l++)
 				{
 					fi = mesh[current][ij].f[l];
 					rho += fi;
-					ux += fi*ex[l];
-					uy += fi*ey[l];
+					ux += fi*exMod[l];
+					uy += fi*eyMod[l];
 				}
-				ux = (ux*c) / rho;
-				uy = (uy*c) / rho;
+				/*ux = (ux*c) / rho;
+				uy = (uy*c) / rho;*/
+				//ux = ux / rho;
+				//uy = uy / rho;
 				
 				mesh[current][ij].rho = rho;
 				mesh[current][ij].u[0] = ux;
@@ -258,7 +266,7 @@ void LBMSolver::TimeStep(double t)
 				for (int l = 0; l < finv.size(); l++)
 				{
 					double f0 = Fequi(ux, uy, rho, l);
-					mesh[current][ij].f[l] = mesh[current][ij].f[l] - (1 / tau)*(mesh[current][ij].f[l] - mesh[current][ij].feq[l]);
+					mesh[current][ij].f[l] = mesh[current][ij].f[l] - (1.0 / tau)*(mesh[current][ij].f[l] - mesh[current][ij].feq[l]);
 				}
 
 				//Collision: Calculate velocities for display and particle tracing. 
@@ -390,8 +398,12 @@ void LBMSolver::TimeStep(double t)
 
 double LBMSolver::Fequi(double ux, double uy, double rho, int l)
 {
-	double eDotu = ex[l] * ux + ey[l] * uy;
-	return w[l] * rho*(1 - (3.*(ux*ux + uy*uy)) / (2.*c*c) + (3.*eDotu) / c + (9.*eDotu*eDotu) / (2.*c*c));
+	/*std::valarray<double> exMod = c*ex;    
+	std::valarray<double> eyMod = c*ey;*/
+
+	double eDotu = exMod[l] * ux + eyMod[l] * uy;
+	//return w[l] * rho*(1 - (3.*(ux*ux + uy*uy)) / (2.*c*c) + (3.*eDotu) / (c*c) + (9.*eDotu*eDotu) / (2.*c*c*c*c));
+	return w[l] *(rho - (3.*(ux*ux + uy*uy)) / (2.*c*c) + (3.*eDotu) / (c*c) + (9.*eDotu*eDotu) / (2.*c*c*c*c));
 }
 
 double LBMSolver::MassDistribute(int type, const std::vector<int>& cells)

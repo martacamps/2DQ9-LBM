@@ -72,8 +72,10 @@ private:
 	double stableTs(int ij);			//Calculate a modified relaxation time for each cell by using the Smagorinsky sub-grid turbulence model
 	std::array<double, 2> g;			//acceleration of gravity
 	const std::valarray<double> w;		//Weights
-	const std::valarray<int> ex;        //x components of the velocity vectors
-	const std::valarray<int> ey;        //y components of the velocity vectors
+	const std::valarray<int> ex;     //x direction of the velocity vectors
+	const std::valarray<int> ey;     //y direction of the velocity vectors
+	std::valarray<double> exMod;		//x components of the velocity vectors
+	std::valarray<double> eyMod;		//y components of the velocity vectors
 	const std::valarray<double> modE;   //Modulus of each direction vector e. 
 	const std::valarray<int> finv;      //Index of the velocity vector pointing in the opposite direction for each of the 9 velocity vectors. 
 	std::list<int> changeTag;           //List of the cells that are going to change tag at the begining of the next step
