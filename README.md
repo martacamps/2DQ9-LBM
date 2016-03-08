@@ -21,6 +21,8 @@ Controls:
 
 
 LBM Solver based on Nils Thürey (2003) 'A single-phase free-surface Lattice Boltzmann Method'. Retrieved from http://www.thuerey.de/ntoken/download/nthuerey_030602_da.pdf
+Also consulted Yuanxun Bill Bao & Justin Meskas (2011) 'Lattice Boltzmann Method for Fluid Simulations'. Retrieved from http://www.cims.nyu.edu/~billbao/report930.pdf 
+
 
 
 
