@@ -25,6 +25,8 @@ LBMSolver::LBMSolver() :
 w({ { 4. / 9., 1. / 9., 1. / 9., 1. / 9., 1. / 9., 1. / 36., 1. / 36., 1. / 36., 1. / 36. } }),
 ex({ { 0, 1, -1, 0, 0, 1, -1, 1, -1 } }),
 ey({ { 0, 0, 0, 1, -1, -1, -1, 1, 1 } }),
+exMod({ { 0, 1, -1, 0, 0, 1, -1, 1, -1 } }),
+eyMod({ { 0, 0, 0, 1, -1, -1, -1, 1, 1 } }),
 finv({ { 0, 2, 1, 4, 3, 8, 7, 6, 5 } }),
 current(0),
 other(1)
@@ -41,6 +43,8 @@ void LBMSolver::Create(double nu, double sig, double v, double rho, double dx, d
 	dt = sqrt((1e-4*cellSize) / 9.81);    // So the gravity acceleration in the model is not larger than 1e-4.
 	g = -9.81*(dt*dt) / cellSize;
 	c = cellSize/dt;
+	exMod = c*exMod;
+	eyMod = c*eyMod;
 
 	double nuStar = nu*(dt / (cellSize*cellSize));
 	tau = (6 * nuStar + 1) / 2;
@@ -60,6 +64,8 @@ void LBMSolver::Create(double nu, double sig, double v, double rho, double dx, d
 	mesh = new LBMCell*[2];
 	mesh[current] = new LBMCell[numCells*numCells];
 	mesh[other] = new LBMCell[numCells*numCells];
+
+	file.open("results.txt");
 
 }
 
@@ -128,11 +134,11 @@ void LBMSolver::TimeStep(double t)
 				{
 					fi = mesh[current][ij].f[l];
 					rho += fi;
-					ux += fi*ex[l];
-					uy += fi*ey[l];
+					ux += fi*exMod[l];
+					uy += fi*eyMod[l];
 				}
-				ux = (ux*c)/rho;
-				uy = (uy*c)/rho;
+				//ux = (ux*c)/rho;
+				//uy = (uy*c)/rho;
 			}
 			mesh[current][ij].rho = rho;
 			mesh[current][ij].u[0] = ux;
@@ -147,8 +153,9 @@ void LBMSolver::TimeStep(double t)
 			//Collision
 			for (int l = 0; l < finv.size(); l++)
 			{
-				double eDotu = ex[l] * ux + ey[l] * uy;
-				double f0 = w[l] *rho*(1 - (3.*(ux*ux + uy*uy)) / (2.*c*c) + (3.*eDotu)/c  + (9.*eDotu*eDotu) / (2.*c*c));  
+				double eDotu = exMod[l] * ux + eyMod[l] * uy;
+				//double f0 = w[l] *rho*(1 - (3.*(ux*ux + uy*uy)) / (2.*c*c) + (3.*eDotu)/c  + (9.*eDotu*eDotu) / (2.*c*c));  
+				double f0 = w[l] * (rho - (3.*(ux*ux + uy*uy)) / (2.*c*c) + (3.*eDotu) / (c*c) + (9.*eDotu*eDotu) / (2.*c*c*c*c));
 				mesh[current][ij].f[l] = mesh[current][ij].f[l] - (1 / tau)*(mesh[current][ij].f[l] - f0);
 			}
 
@@ -282,6 +289,8 @@ void LBMSolver::Render()
 	colourScale.DrawText<std::string>(GLUT_BITMAP_HELVETICA_18, 0.9*win_width, 0.96*win_height, &time);
 
 	glutSwapBuffers();
+
+
 }
 
 LBMSolver::~LBMSolver()

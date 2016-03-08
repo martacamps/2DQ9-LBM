@@ -54,8 +54,10 @@ private:
 	LBMCell **mesh;                     //LBM mesh
 	int index(int i, int j) { return i*numCells + j; }  //To access the mesh array as it was a 2D matrix.
 	const std::array<double, 9> w;		//Weights
-	const std::array<int, 9> ex;        //x components of the velocity vectors
-	const std::array<int, 9> ey;        //y components of the velocity vectors
+	const std::array<int, 9> ex;        //x direction of the velocity vectors
+	const std::array<int, 9> ey;        //y direction of the velocity vectors
+	std::valarray<double> exMod;        //x components of the velocity vectors
+	std::valarray<double> eyMod;        //y components of the velocity vectors
 	const std::array<int, 9> finv;      //Index of the velocity vector pointing in the opposite direction for each of the 9 velocity vectors. 
 };
 
