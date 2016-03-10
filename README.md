@@ -6,7 +6,7 @@ Requires:
     C++11
     Glut
 
-Video demo: https://youtu.be/Q3rYTyEtlEk
+Video demo: https://youtu.be/M98TlNOlWDk
     
 
 2DLBM lets you choose between 4 already set up simulations or allows you to manually input the simulation parameters. It also allows you to choose the frequency in which the plot of the results is updated. Once the simulation starts, a new window appears showing its results at each nth step. 
