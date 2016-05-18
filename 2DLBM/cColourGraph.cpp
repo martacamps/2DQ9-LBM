@@ -27,7 +27,7 @@ cColourGraph::cColourGraph()
 
 }
 
-void cColourGraph::SetColours(std::vector<double> *colours, int numColours)
+void cColourGraph::SetColours(std::vector<float> *colours, int numColours)
 {
 	//Check that we have the same number of colours and intervals. 
 	if (colours->size() / 3. != m_intervals.size())
@@ -55,14 +55,14 @@ cColourGraph::~cColourGraph()
 {
 }
 
-bool cColourGraph::PickColour(double value, double *colourx, double* coloury, double* colourz)
+bool cColourGraph::PickColour(float value, float *colourx, float* coloury, float* colourz)
 {
 	//The value is out of range
 	if ((value < m_intervals[0]) || (value > m_intervals.back()))
 		return false;
 
 	//Find the interval of the value. 
-	std::vector<double>::iterator low;
+	std::vector<float>::iterator low;
 	int ilow, ihigh;
 	low = std::lower_bound(m_intervals.begin(), m_intervals.end(), value);
 	
@@ -76,7 +76,7 @@ bool cColourGraph::PickColour(double value, double *colourx, double* coloury, do
 		ilow = ihigh - 1;
 
 	//Choose the Colour by linear interpolation between the two colours in the interval. 
-	double lambda = value / (m_intervals[ihigh] - m_intervals[ilow]) - m_intervals[ilow] / (m_intervals[ihigh] - m_intervals[ilow]);
+	float lambda = value / (m_intervals[ihigh] - m_intervals[ilow]) - m_intervals[ilow] / (m_intervals[ihigh] - m_intervals[ilow]);
 	*colourx = m_colours[3*ilow]+lambda*m_diffColours[3*ilow];
 	*coloury = m_colours[3 * ilow + 1] + lambda*m_diffColours[3 * ilow + 1];
 	*colourz = m_colours[3 * ilow + 2] + lambda*m_diffColours[3 * ilow + 2];
@@ -110,7 +110,7 @@ void cColourGraph::DrawScale(std::string name)
 	
 	for (int i = 0; i < m_intervals.size(); i++)
 	{
-		DrawText<double>(GLUT_BITMAP_HELVETICA_18, 0.55f, (i*0.9) / (numIntervals), &m_intervals[i]);
+		DrawText<float>(GLUT_BITMAP_HELVETICA_18, 0.55f, (i*0.9) / (numIntervals), &m_intervals[i]);
 	}	
 }
 

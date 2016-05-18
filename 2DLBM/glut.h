@@ -69,8 +69,8 @@ typedef unsigned short wchar_t;
 #  endif
 # endif
 
-/* To disable supression of annoying warnings about doubles being promoted
-   to doubles, define GLUT_NO_WARNING_DISABLE in your compile preprocessor
+/* To disable supression of annoying warnings about floats being promoted
+   to floats, define GLUT_NO_WARNING_DISABLE in your compile preprocessor
    options. */
 # ifndef GLUT_NO_WARNING_DISABLE
 #  pragma warning (disable:4244)  /* Disable bogus VC++ 4.2 conversion warnings. */
@@ -229,7 +229,7 @@ extern void exit(int);
 #define GLUT_RGBA			GLUT_RGB
 #define GLUT_INDEX			1
 #define GLUT_SINGLE			0
-#define GLUT_DOUBLE			2
+#define GLUT_float			2
 #define GLUT_ACCUM			4
 #define GLUT_ALPHA			8
 #define GLUT_DEPTH			16
@@ -361,7 +361,7 @@ GLUTAPI void *glutBitmapHelvetica18;
 #define GLUT_WINDOW_ACCUM_GREEN_SIZE	((GLenum) 112)
 #define GLUT_WINDOW_ACCUM_BLUE_SIZE	((GLenum) 113)
 #define GLUT_WINDOW_ACCUM_ALPHA_SIZE	((GLenum) 114)
-#define GLUT_WINDOW_DOUBLEBUFFER	((GLenum) 115)
+#define GLUT_WINDOW_floatBUFFER	((GLenum) 115)
 #define GLUT_WINDOW_RGBA		((GLenum) 116)
 #define GLUT_WINDOW_PARENT		((GLenum) 117)
 #define GLUT_WINDOW_NUM_CHILDREN	((GLenum) 118)
@@ -598,8 +598,8 @@ GLUTAPI void APIENTRY glutJoystickFunc(void (GLUTCALLBACK *func)(unsigned int bu
 #endif
 
 /* GLUT color index sub-API. */
-GLUTAPI void APIENTRY glutSetColor(int, GLdouble red, GLdouble green, GLdouble blue);
-GLUTAPI GLdouble APIENTRY glutGetColor(int ndx, int component);
+GLUTAPI void APIENTRY glutSetColor(int, GLfloat red, GLfloat green, GLfloat blue);
+GLUTAPI GLfloat APIENTRY glutGetColor(int ndx, int component);
 GLUTAPI void APIENTRY glutCopyColormap(int win);
 
 /* GLUT state retrieval sub-API. */
@@ -625,18 +625,18 @@ GLUTAPI int APIENTRY glutStrokeLength(void *font, const unsigned char *string);
 #endif
 
 /* GLUT pre-built models sub-API */
-GLUTAPI void APIENTRY glutWireSphere(GLdouble radius, GLint slices, GLint stacks);
-GLUTAPI void APIENTRY glutSolidSphere(GLdouble radius, GLint slices, GLint stacks);
-GLUTAPI void APIENTRY glutWireCone(GLdouble base, GLdouble height, GLint slices, GLint stacks);
-GLUTAPI void APIENTRY glutSolidCone(GLdouble base, GLdouble height, GLint slices, GLint stacks);
-GLUTAPI void APIENTRY glutWireCube(GLdouble size);
-GLUTAPI void APIENTRY glutSolidCube(GLdouble size);
-GLUTAPI void APIENTRY glutWireTorus(GLdouble innerRadius, GLdouble outerRadius, GLint sides, GLint rings);
-GLUTAPI void APIENTRY glutSolidTorus(GLdouble innerRadius, GLdouble outerRadius, GLint sides, GLint rings);
+GLUTAPI void APIENTRY glutWireSphere(GLfloat radius, GLint slices, GLint stacks);
+GLUTAPI void APIENTRY glutSolidSphere(GLfloat radius, GLint slices, GLint stacks);
+GLUTAPI void APIENTRY glutWireCone(GLfloat base, GLfloat height, GLint slices, GLint stacks);
+GLUTAPI void APIENTRY glutSolidCone(GLfloat base, GLfloat height, GLint slices, GLint stacks);
+GLUTAPI void APIENTRY glutWireCube(GLfloat size);
+GLUTAPI void APIENTRY glutSolidCube(GLfloat size);
+GLUTAPI void APIENTRY glutWireTorus(GLfloat innerRadius, GLfloat outerRadius, GLint sides, GLint rings);
+GLUTAPI void APIENTRY glutSolidTorus(GLfloat innerRadius, GLfloat outerRadius, GLint sides, GLint rings);
 GLUTAPI void APIENTRY glutWireDodecahedron(void);
 GLUTAPI void APIENTRY glutSolidDodecahedron(void);
-GLUTAPI void APIENTRY glutWireTeapot(GLdouble size);
-GLUTAPI void APIENTRY glutSolidTeapot(GLdouble size);
+GLUTAPI void APIENTRY glutWireTeapot(GLfloat size);
+GLUTAPI void APIENTRY glutSolidTeapot(GLfloat size);
 GLUTAPI void APIENTRY glutWireOctahedron(void);
 GLUTAPI void APIENTRY glutSolidOctahedron(void);
 GLUTAPI void APIENTRY glutWireTetrahedron(void);

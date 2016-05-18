@@ -28,21 +28,21 @@ public:
 	~cColourGraph();
 
 	//Set the numeric intervals
-	void SetIntervals(std::vector<double> *intervals) { m_intervals = *intervals; } 
+	void SetIntervals(std::vector<float> *intervals) { m_intervals = *intervals; } 
 	//Set the RGB (from 0 to 1) colour code for every interval.
-	void SetColours(std::vector<double> *colours, int numColours);                     
+	void SetColours(std::vector<float> *colours, int numColours);                     
 
 	//Draw the colour scale. The string name will be written on top of it.  
 	void DrawScale(std::string name);
 	//Write any text, numbers...
 	template <class T> void DrawText(GLvoid *fontStyle, float posx, float posy, T *text);
 	//Colourx, coloury, colourz are the RGB code of the colour corresponding to value. It returns true if value is between the first and the last interval, and false if it isn´t.
-	bool PickColour(double value, double *colourx, double* coloury, double* colourz);
+	bool PickColour(float value, float *colourx, float* coloury, float* colourz);
 
 private:
-	std::vector<double> m_colours;          //First RGB colour for each interval
-	std::vector<double> m_diffColours;      //Second RGB colour for each interval minus first RGB colour for each interval
-    std::vector<double> m_intervals;        //Value of each interval.
+	std::vector<float> m_colours;          //First RGB colour for each interval
+	std::vector<float> m_diffColours;      //Second RGB colour for each interval minus first RGB colour for each interval
+    std::vector<float> m_intervals;        //Value of each interval.
 
 };
 

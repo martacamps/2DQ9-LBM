@@ -32,32 +32,32 @@ public:
 	LBMSolver();
 
 	//Input the solver parameters and prepare the solver to start
-	void Create(double nu, double sig, double dum, double rho, double dx, double size, double time);
+	void Create(float nu, float sig, float dum, float rho, float dx, float size, float time);
 	//Set the initial conditions for a lid driven cavity flow
 	void InitialField();       
 	//2DQ9 LBM time step
-	void TimeStep(double t);
+	void TimeStep(float t);
 	//Draws the state of the simulation.
 	void Render();            
 	~LBMSolver();
 
 private:
-	double tau;							//relaxation time
-	double c;							//lattice speed
-	double sigma;						//surface tension parameter
-	double cellSize;	                //cell Size in meters
+	float m_tau;							//relaxation time
+	float m_c;							//lattice speed
+	float sigma;						//surface tension parameter
+	float cellSize;	                //cell Size in meters
 	int numCells;						//number of cells in each direction
-	double dt;                          //lenght of each time step in seconds
-	double lidSpeed;                    //Horizontal Speed of the lid
-	double g;							//acceleration of gravity
+	float dt;                          //lenght of each time step in seconds
+	float lidSpeed;                    //Horizontal Speed of the lid
+	float g;							//acceleration of gravity
 	int current, other;					//To differenciate between the current mesh and the auxiliar mesh
 	LBMCell **mesh;                     //LBM mesh
 	int index(int i, int j) { return i*numCells + j; }  //To access the mesh array as it was a 2D matrix.
-	const std::array<double, 9> w;		//Weights
+	const std::array<float, 9> w;		//Weights
 	const std::array<int, 9> ex;        //x direction of the velocity vectors
 	const std::array<int, 9> ey;        //y direction of the velocity vectors
-	std::valarray<double> exMod;        //x components of the velocity vectors
-	std::valarray<double> eyMod;        //y components of the velocity vectors
+	std::valarray<float> exMod;        //x components of the velocity vectors
+	std::valarray<float> eyMod;        //y components of the velocity vectors
 	const std::array<int, 9> finv;      //Index of the velocity vector pointing in the opposite direction for each of the 9 velocity vectors. 
 };
 

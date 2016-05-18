@@ -158,7 +158,7 @@ void cSolver::Render()
 
 }
 
-void cSolver::TimeStep(double t)
+void cSolver::TimeStep(float t)
 {
 
 }

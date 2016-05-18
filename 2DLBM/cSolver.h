@@ -45,7 +45,7 @@ public:
 	void ReadKeyboard(unsigned char key, int x, int y, bool press);
 
 	//Time step of the numerical solver
-	virtual void TimeStep(double t);
+	virtual void TimeStep(float t);
 
 	//Output
 	virtual void Render();

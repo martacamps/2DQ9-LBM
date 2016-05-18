@@ -90,8 +90,8 @@ int main(int argc, char* argv[])
 		//GLUT initialization
 		glutInit(&argc, argv);
 
-		//RGBA with double buffer
-		glutInitDisplayMode(GLUT_RGBA | GLUT_ALPHA | GLUT_DOUBLE);
+		//RGBA with float buffer
+		glutInitDisplayMode(GLUT_RGBA | GLUT_ALPHA | GLUT_float);
 
 		//Create centered window
 		res_x = glutGet(GLUT_SCREEN_WIDTH);
@@ -128,7 +128,7 @@ int main(int argc, char* argv[])
 			//cavity.Create(1e-6, 7e-4, 0.4, 1000, 0.000004, 0.001, 150);   //Re 400 fine
 			break;
 		default:
-			double nu, v, dx, size, time;
+			float nu, v, dx, size, time;
 			std::cout << "Set fluid's kinematic viscosity [m2/s]:" << std::endl;
 			std::cin >> line;
 			nu = std::stod(line);

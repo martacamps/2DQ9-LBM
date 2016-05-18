@@ -34,7 +34,7 @@ other(1)
 
 }
 
-void LBMSolver::Create(double nu, double sig, double v, double rho, double dx, double size, double time)
+void LBMSolver::Create(float nu, float sig, float v, float rho, float dx, float size, float time)
 {
 	cellSize = dx;
 	lidSpeed = v;
@@ -42,20 +42,20 @@ void LBMSolver::Create(double nu, double sig, double v, double rho, double dx, d
 	//Compute necessary information from input parameters
 	dt = sqrt((1e-4*cellSize) / 9.81);    // So the gravity acceleration in the model is not larger than 1e-4.
 	g = -9.81*(dt*dt) / cellSize;
-	c = cellSize/dt;
-	exMod = c*exMod;
-	eyMod = c*eyMod;
+	m_c = cellSize/dt;
+	exMod = m_c*exMod;
+	eyMod = m_c*eyMod;
 
-	double nuStar = nu*(dt / (cellSize*cellSize));
-	tau = (6 * nuStar + 1) / 2;
-	if (tau < 0.5 || tau > 2.5)
+	float nuStar = nu*(dt / (cellSize*cellSize));
+	m_tau = (6 * nuStar + 1) / 2;
+	if (m_tau < 0.5 || m_tau > 2.5)
 	{
 		std::ostringstream strs;
-		strs << "Relaxation time = " << tau << " out of range, simulation will be too unstable";
+		strs << "Relaxation time = " << m_tau << " out of range, simulation will be too unstable";
 		std::string str = strs.str();
 		throw(str);
 	}
-	double dm = rho*cellSize*cellSize*cellSize;
+	float dm = rho*cellSize*cellSize*cellSize;
 	sigma = sig*(dt*dt) / dm;
 	numCells = (int)std::round(size / cellSize);
 	numSteps = (int)std::round(time / dt);
@@ -93,7 +93,7 @@ void LBMSolver::InitialField()
 	}
 }
 
-void LBMSolver::TimeStep(double t)
+void LBMSolver::TimeStep(float t)
 {
 	
 	for (int i = 1; i < numCells-1; i++)
@@ -120,14 +120,14 @@ void LBMSolver::TimeStep(double t)
 			}
 
 			//Collision
-			double rho = 0.0, ux = 0.0, uy = 0.0;
+			float rho = 0.0, ux = 0.0, uy = 0.0;
 			if (mesh[current][ij].BC == FIXEDV)         //Fix the density and velocity for the cells marked as FIXEDV (the lid cells)
 			{
 				rho = 1.; ux = lidSpeed; uy = 0.0;
 			}
 			else                                       //calculate density and velocity 
 			{
-				double fi;
+				float fi;
 				for (int l = 0; l < finv.size(); l++)
 				{
 					fi = mesh[current][ij].f[l];
@@ -145,22 +145,22 @@ void LBMSolver::TimeStep(double t)
 			//Collision: apply gravity
 			if (mesh[current][ij].BC != FIXEDV)
 			{
-				uy += tau*g;
+				uy += m_tau*g;
 			}
 		
 			//Collision
 			for (int l = 0; l < finv.size(); l++)
 			{
-				double eDotu = exMod[l] * ux + eyMod[l] * uy;
-				//double f0 = w[l] *rho*(1 - (3.*(ux*ux + uy*uy)) / (2.*c*c) + (3.*eDotu)/c  + (9.*eDotu*eDotu) / (2.*c*c));  
-				double f0 = w[l] * (rho - (3.*(ux*ux + uy*uy)) / (2.*c*c) + (3.*eDotu) / (c*c) + (9.*eDotu*eDotu) / (2.*c*c*c*c));
-				mesh[current][ij].f[l] = mesh[current][ij].f[l] - (1 / tau)*(mesh[current][ij].f[l] - f0);
+				float eDotu = exMod[l] * ux + eyMod[l] * uy;
+				//float f0 = w[l] *rho*(1 - (3.*(ux*ux + uy*uy)) / (2.*c*c) + (3.*eDotu)/c  + (9.*eDotu*eDotu) / (2.*c*c));  
+				float f0 = w[l] * (rho - (3.*(ux*ux + uy*uy)) / (2.*m_c*m_c) + (3.*eDotu) / (m_c*m_c) + (9.*eDotu*eDotu) / (2.*m_c*m_c*m_c*m_c));
+				mesh[current][ij].f[l] = mesh[current][ij].f[l] - (1 / m_tau)*(mesh[current][ij].f[l] - f0);
 			}
 
 			//Collision: Calculate velocities for display and particle tracing. 
 			if (mesh[current][ij].BC != FIXEDV)
 			{
-				mesh[current][ij].u[1] += 0.5*tau*g;
+				mesh[current][ij].u[1] += 0.5*m_tau*g;
 			}
 		}
 	}
@@ -178,7 +178,7 @@ void LBMSolver::Render()
 	glLoadIdentity();
 
 	//Set colours and intervals for the selected plot. 
-	std::vector<double> intervals, colours;
+	std::vector<float> intervals, colours;
 	std::string title;
 	if (vis[2])  //Colours by velocity
 	{
@@ -198,7 +198,7 @@ void LBMSolver::Render()
 	{
 		intervals = { FLUID, NOSLIPBC };
 		colourScale.SetIntervals(&intervals);
-		colours = { 0.2, 0.6, 1.0, 0.4, 0.2, 0. };   //light blue, brown.
+		colours = { 0.2f, 0.6f, 1.0f, 0.4f, 0.2f, 0.f };   //light blue, brown.
 		colourScale.SetColours(&colours, 2);
 		title = "cell type";
 	}
@@ -207,8 +207,8 @@ void LBMSolver::Render()
 	glPushMatrix();
 	glScalef((0.9*win_width) / numCells, win_height / numCells, 1.);
 	glShadeModel(GL_FLAT);
-	std::vector<double> ux, uy, mod;
-	double colourx, coloury, colourz;
+	std::vector<float> ux, uy, mod;
+	float colourx, coloury, colourz;
 	bool inside;
 	for (int i = 0; i < numCells; i++)
 	{
@@ -223,8 +223,8 @@ void LBMSolver::Render()
 			}
 			else
 			{
-				ux.push_back(mesh[other][index(i, j)].u[0] / c);
-				uy.push_back(mesh[other][index(i, j)].u[1] / c);
+				ux.push_back(mesh[other][index(i, j)].u[0] / m_c);
+				uy.push_back(mesh[other][index(i, j)].u[1] / m_c);
 			}
 			mod.push_back(sqrt(ux.back()*ux.back() + uy.back()*uy.back()));
 			if (vis[2])	 //Colours by velocity
@@ -233,7 +233,7 @@ void LBMSolver::Render()
 			}
 			else	//Colours by cell tag
 			{
-				inside = colourScale.PickColour((double)mesh[other][index(i, j)].tag, &colourx, &coloury, &colourz);
+				inside = colourScale.PickColour((float)mesh[other][index(i, j)].tag, &colourx, &coloury, &colourz);
 			}
 			if (!inside)
 			{
