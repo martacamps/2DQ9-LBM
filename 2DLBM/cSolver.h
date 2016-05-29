@@ -56,13 +56,13 @@ public:
 
 
 protected:
-	int numSteps;                     //Number of time steps required to finish the simulation
-    int renderStep;                   //Render is called every renderStep time Step
-	unsigned char keys[256];          //Keyboard ASCII codes.
-	int t;                            //Number of loops performed by the program
-	std::vector<bool> vis;            //Visualization modes. 
-	int state;                       //State of the simulation: running, paused or exit. 
-	cColourGraph colourScale;        //Colour scale used to represent the results of the simulation. 
+	int m_numSteps;                     //Number of time steps required to finish the simulation
+    int m_renderStep;                   //Render is called every m_renderStep time Step
+	unsigned char m_keys[256];          //Keyboard ASCII codes.
+	int m_t;                            //Number of loops performed by the program
+	std::vector<bool> m_vis;            //Visualization modes. 
+	int m_state;                       //State of the simulation: running, paused or exit. 
+	cColourGraph m_colourScale;        //Colour scale used to represent the results of the simulation. 
 
 	 
 	

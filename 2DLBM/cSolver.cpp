@@ -22,7 +22,7 @@
 
 
 
-cSolver::cSolver() : t(0), vis(1), state(1)
+cSolver::cSolver() : m_t(0), m_vis(1), m_state(1)
 {
 }
 
@@ -41,40 +41,40 @@ void cSolver::Init(int i_renderStep)
 	glMatrixMode(GL_MODELVIEW);
 
 	//3 visualization options
-	vis.back() = true;
+	m_vis.back() = true;
 	for (int i = 0; i < 3; i++)
-		vis.push_back(true);
+		m_vis.push_back(true);
 
 	//Solver initialization
-	renderStep = i_renderStep;
+	m_renderStep = i_renderStep;
 }
 
 void cSolver::Input()
 {
-	if (keys[27])      //ESC to exit
-		state = 0;
-	if (keys[32])      //SPACE to pause simulation
+	if (m_keys[27])      //ESC to exit
+		m_state = 0;
+	if (m_keys[32])      //SPACE to pause simulation
 	{
- 		state = -state;
-		keys[32] = 0;
+ 		m_state = -m_state;
+		m_keys[32] = 0;
 		Render();
 	}
-	if (keys[49])      //Activate / deactivate visualization mode 1
+	if (m_keys[49])      //Activate / deactivate visualization mode 1
 	{
-		vis[0] = !vis[0];
-		keys[49] = 0;
+		m_vis[0] = !m_vis[0];
+		m_keys[49] = 0;
 		Render();
 	}
-	if (keys[50])      //Activate / deactivate visualization mode 2
+	if (m_keys[50])      //Activate / deactivate visualization mode 2
 	{
-		vis[1] = !vis[1];
-		keys[50] = 0;
+		m_vis[1] = !m_vis[1];
+		m_keys[50] = 0;
 		Render();
 	}
-	if (keys[51])      //Activate / deactivate visualization mode 3 
+	if (m_keys[51])      //Activate / deactivate visualization mode 3 
 	{
-		vis[2] = !vis[2];
-		keys[51] = 0;
+		m_vis[2] = !m_vis[2];
+		m_keys[51] = 0;
 		Render();
 	}
 
@@ -87,17 +87,17 @@ bool cSolver::Loop()
 
 	//Process input
 	Input();
-	switch (state)
+	switch (m_state)
 	{
 	case 0:
 		return false;
 		break;
 	case 1:
 		//Simulation loop
-		if (t <= numSteps)
+		if (m_t <= m_numSteps)
 		{
-			TimeStep(t);
-			if (t%renderStep == 0)
+			TimeStep(m_t);
+			if (m_t%m_renderStep == 0)
 			{
 				Render();
 				Save();
@@ -105,7 +105,7 @@ bool cSolver::Loop()
 		}
 		else
 			Render();     //Continuously render the last image when the simulation finishes. 
-		t++;
+		m_t++;
 		break;
 	case -1:
 		PauseMenu();
@@ -124,15 +124,15 @@ void cSolver::PauseMenu()
 	glLoadIdentity();
 	glColor3f(1., 1., 1.);
 	std::string text("[SPACE BAR] Continue simulation");
-	colourScale.DrawText<std::string>(GLUT_BITMAP_HELVETICA_18, 0.1*win_width, 0.8*win_height, &text);
+	m_colourScale.DrawText<std::string>(GLUT_BITMAP_HELVETICA_18, 0.1*win_width, 0.8*win_height, &text);
 	text = "[1] Hide /show velocity lines";
-	colourScale.DrawText<std::string>(GLUT_BITMAP_HELVETICA_18, 0.1*win_width, 0.7*win_height, &text);
+	m_colourScale.DrawText<std::string>(GLUT_BITMAP_HELVETICA_18, 0.1*win_width, 0.7*win_height, &text);
 	text = "[2] Change between colour scale 1 and 2";
-	colourScale.DrawText<std::string>(GLUT_BITMAP_HELVETICA_18, 0.1*win_width, 0.6*win_height, &text);
+	m_colourScale.DrawText<std::string>(GLUT_BITMAP_HELVETICA_18, 0.1*win_width, 0.6*win_height, &text);
 	text = "[3] Change between velocity and cell tag view";
-	colourScale.DrawText<std::string>(GLUT_BITMAP_HELVETICA_18, 0.1*win_width, 0.5*win_height, &text);
+	m_colourScale.DrawText<std::string>(GLUT_BITMAP_HELVETICA_18, 0.1*win_width, 0.5*win_height, &text);
 	text = "[ESC] Exit program";
-	colourScale.DrawText<std::string>(GLUT_BITMAP_HELVETICA_18, 0.1*win_width, 0.4*win_height, &text);
+	m_colourScale.DrawText<std::string>(GLUT_BITMAP_HELVETICA_18, 0.1*win_width, 0.4*win_height, &text);
 	glutSwapBuffers();
 }
 
@@ -149,7 +149,7 @@ void cSolver::Finalize()
 //Input
 void cSolver::ReadKeyboard(unsigned char key, int x, int y, bool press)
 {
-	keys[key] = press;
+	m_keys[key] = press;
 }
 
 //Output

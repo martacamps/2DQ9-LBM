@@ -22,31 +22,31 @@
 
 
 LBMSolver::LBMSolver() :
-w({ { 4. / 9., 1. / 9., 1. / 9., 1. / 9., 1. / 9., 1. / 36., 1. / 36., 1. / 36., 1. / 36. } }),
-ex({ { 0, 1, -1, 0, 0, 1, -1, 1, -1 } }),
-ey({ { 0, 0, 0, 1, -1, -1, -1, 1, 1 } }),
-exMod({ { 0, 1, -1, 0, 0, 1, -1, 1, -1 } }),
-eyMod({ { 0, 0, 0, 1, -1, -1, -1, 1, 1 } }),
-finv({ { 0, 2, 1, 4, 3, 8, 7, 6, 5 } }),
-current(0),
-other(1)
+m_w({ { 4. / 9., 1. / 9., 1. / 9., 1. / 9., 1. / 9., 1. / 36., 1. / 36., 1. / 36., 1. / 36. } }),
+m_ex({ { 0, 1, -1, 0, 0, 1, -1, 1, -1 } }),
+m_ey({ { 0, 0, 0, 1, -1, -1, -1, 1, 1 } }),
+m_exMod({ { 0, 1, -1, 0, 0, 1, -1, 1, -1 } }),
+m_eyMod({ { 0, 0, 0, 1, -1, -1, -1, 1, 1 } }),
+m_finv({ { 0, 2, 1, 4, 3, 8, 7, 6, 5 } }),
+m_current(0),
+m_other(1)
 {
 
 }
 
 void LBMSolver::Create(float nu, float sig, float v, float rho, float dx, float size, float time)
 {
-	cellSize = dx;
-	lidSpeed = v;
+	m_cellSize = dx;
+	m_lidSpeed = v;
 	
 	//Compute necessary information from input parameters
-	dt = sqrt((1e-4*cellSize) / 9.81);    // So the gravity acceleration in the model is not larger than 1e-4.
-	g = -9.81*(dt*dt) / cellSize;
-	m_c = cellSize/dt;
-	exMod = m_c*exMod;
-	eyMod = m_c*eyMod;
+	m_dt = sqrt((1e-4*m_cellSize) / 9.81);    // So the gravity acceleration in the model is not larger than 1e-4.
+	m_g = -9.81*(m_dt*m_dt) / m_cellSize;
+	m_c = m_cellSize/m_dt;
+	m_exMod = m_c*m_exMod;
+	m_eyMod = m_c*m_eyMod;
 
-	float nuStar = nu*(dt / (cellSize*cellSize));
+	float nuStar = nu*(m_dt / (m_cellSize*m_cellSize));
 	m_tau = (6 * nuStar + 1) / 2;
 	if (m_tau < 0.5 || m_tau > 2.5)
 	{
@@ -55,118 +55,118 @@ void LBMSolver::Create(float nu, float sig, float v, float rho, float dx, float 
 		std::string str = strs.str();
 		throw(str);
 	}
-	float dm = rho*cellSize*cellSize*cellSize;
-	sigma = sig*(dt*dt) / dm;
-	numCells = (int)std::round(size / cellSize);
-	numSteps = (int)std::round(time / dt);
+	float dm = rho*m_cellSize*m_cellSize*m_cellSize;
+	m_sigma = sig*(m_dt*m_dt) / dm;
+	m_numCells = (int)std::round(size / m_cellSize);
+	m_numSteps = (int)std::round(time / m_dt);
 
 	//Create LBM mesh. 
-	mesh = new LBMCell*[2];
-	mesh[current] = new LBMCell[numCells*numCells];
-	mesh[other] = new LBMCell[numCells*numCells];
+	m_mesh = new LBMCell*[2];
+	m_mesh[m_current] = new LBMCell[m_numCells*m_numCells];
+	m_mesh[m_other] = new LBMCell[m_numCells*m_numCells];
 
 }
 
 void LBMSolver::InitialField()  
 {
 	//Set the cell tags for the Boundary Conditions.
-	for (int j = 0; j < numCells; j++)
+	for (int j = 0; j < m_numCells; j++)
 	{
-		mesh[current][index(0, j)].tag = NOSLIPBC;
-		mesh[current][index(numCells - 1, j)].tag = NOSLIPBC;
+		m_mesh[m_current][index(0, j)].tag = NOSLIPBC;
+		m_mesh[m_current][index(m_numCells - 1, j)].tag = NOSLIPBC;
 		
-		mesh[other][index(0, j)].tag = NOSLIPBC;
-		mesh[other][index(numCells - 1, j)].tag = NOSLIPBC;
+		m_mesh[m_other][index(0, j)].tag = NOSLIPBC;
+		m_mesh[m_other][index(m_numCells - 1, j)].tag = NOSLIPBC;
 	}
-	for (int i = 1; i < (numCells - 1); i++)
+	for (int i = 1; i < (m_numCells - 1); i++)
 	{
 
-		mesh[current][index(i, 0)].tag = NOSLIPBC;
-		mesh[current][index(i, numCells - 1)].tag = NOSLIPBC;
-		mesh[other][index(i, 0)].tag = NOSLIPBC;
-		mesh[other][index(i, numCells - 1)].tag = NOSLIPBC;
+		m_mesh[m_current][index(i, 0)].tag = NOSLIPBC;
+		m_mesh[m_current][index(i, m_numCells - 1)].tag = NOSLIPBC;
+		m_mesh[m_other][index(i, 0)].tag = NOSLIPBC;
+		m_mesh[m_other][index(i, m_numCells - 1)].tag = NOSLIPBC;
 	}
-	for (int j = 1; j < (numCells - 1); j++)
+	for (int j = 1; j < (m_numCells - 1); j++)
 	{
-		mesh[current][index(numCells - 2, j)].BC = FIXEDV;
-		mesh[other][index(numCells - 2, j)].BC = FIXEDV;
+		m_mesh[m_current][index(m_numCells - 2, j)].BC = FIXEDV;
+		m_mesh[m_other][index(m_numCells - 2, j)].BC = FIXEDV;
 	}
 }
 
 void LBMSolver::TimeStep(float t)
 {
 	
-	for (int i = 1; i < numCells-1; i++)
+	for (int i = 1; i < m_numCells-1; i++)
 	{
-		for (int j = 1; j < numCells-1; j++)
+		for (int j = 1; j < m_numCells-1; j++)
 		{
 			int ij = index(i, j);
 
 			//Streaming. 
-			for (int l = 0; l < finv.size(); l++)
+			for (int l = 0; l < m_finv.size(); l++)
 			{
-				int inv = finv[l];
-				int previous = index(i + ey[inv], j + ex[inv]);
+				int inv = m_finv[l];
+				int previous = index(i + m_ey[inv], j + m_ex[inv]);
 
 				//check the type of the neighbour cell and perform streaming
-				if (mesh[other][previous].tag == NOSLIPBC)  //The neighbour cell is a non slip wall
+				if (m_mesh[m_other][previous].tag == NOSLIPBC)  //The neighbour cell is a non slip wall
 				{
-					mesh[current][ij].f[l] = mesh[current][ij].f[inv];
+					m_mesh[m_current][ij].f[l] = m_mesh[m_current][ij].f[inv];
 				}
 				else										//The neighbour cell is fluid
 				{
-					mesh[current][ij].f[l] = mesh[other][previous].f[l];
+					m_mesh[m_current][ij].f[l] = m_mesh[m_other][previous].f[l];
 				}     
 			}
 
 			//Collision
 			float rho = 0.0, ux = 0.0, uy = 0.0;
-			if (mesh[current][ij].BC == FIXEDV)         //Fix the density and velocity for the cells marked as FIXEDV (the lid cells)
+			if (m_mesh[m_current][ij].BC == FIXEDV)         //Fix the density and velocity for the cells marked as FIXEDV (the lid cells)
 			{
-				rho = 1.; ux = lidSpeed; uy = 0.0;
+				rho = 1.; ux = m_lidSpeed; uy = 0.0;
 			}
 			else                                       //calculate density and velocity 
 			{
 				float fi;
-				for (int l = 0; l < finv.size(); l++)
+				for (int l = 0; l < m_finv.size(); l++)
 				{
-					fi = mesh[current][ij].f[l];
+					fi = m_mesh[m_current][ij].f[l];
 					rho += fi;
-					ux += fi*exMod[l];
-					uy += fi*eyMod[l];
+					ux += fi*m_exMod[l];
+					uy += fi*m_eyMod[l];
 				}
 				//ux = (ux*c)/rho;
 				//uy = (uy*c)/rho;
 			}
-			mesh[current][ij].rho = rho;
-			mesh[current][ij].u[0] = ux;
-			mesh[current][ij].u[1] = uy;
+			m_mesh[m_current][ij].rho = rho;
+			m_mesh[m_current][ij].u[0] = ux;
+			m_mesh[m_current][ij].u[1] = uy;
 
 			//Collision: apply gravity
-			if (mesh[current][ij].BC != FIXEDV)
+			if (m_mesh[m_current][ij].BC != FIXEDV)
 			{
-				uy += m_tau*g;
+				uy += m_tau*m_g;
 			}
 		
 			//Collision
-			for (int l = 0; l < finv.size(); l++)
+			for (int l = 0; l < m_finv.size(); l++)
 			{
-				float eDotu = exMod[l] * ux + eyMod[l] * uy;
+				float eDotu = m_exMod[l] * ux + m_eyMod[l] * uy;
 				//float f0 = w[l] *rho*(1 - (3.*(ux*ux + uy*uy)) / (2.*c*c) + (3.*eDotu)/c  + (9.*eDotu*eDotu) / (2.*c*c));  
-				float f0 = w[l] * (rho - (3.*(ux*ux + uy*uy)) / (2.*m_c*m_c) + (3.*eDotu) / (m_c*m_c) + (9.*eDotu*eDotu) / (2.*m_c*m_c*m_c*m_c));
-				mesh[current][ij].f[l] = mesh[current][ij].f[l] - (1 / m_tau)*(mesh[current][ij].f[l] - f0);
+				float f0 = m_w[l] * (rho - (3.*(ux*ux + uy*uy)) / (2.*m_c*m_c) + (3.*eDotu) / (m_c*m_c) + (9.*eDotu*eDotu) / (2.*m_c*m_c*m_c*m_c));
+				m_mesh[m_current][ij].f[l] = m_mesh[m_current][ij].f[l] - (1 / m_tau)*(m_mesh[m_current][ij].f[l] - f0);
 			}
 
 			//Collision: Calculate velocities for display and particle tracing. 
-			if (mesh[current][ij].BC != FIXEDV)
+			if (m_mesh[m_current][ij].BC != FIXEDV)
 			{
-				mesh[current][ij].u[1] += 0.5*m_tau*g;
+				m_mesh[m_current][ij].u[1] += 0.5*m_tau*m_g;
 			}
 		}
 	}
-	//Swap meshes
-	other = current;
-	current = 1 - other;
+	//Swap m_meshes
+	m_other = m_current;
+	m_current = 1 - m_other;
 }
 
 void LBMSolver::Render()
@@ -180,60 +180,60 @@ void LBMSolver::Render()
 	//Set colours and intervals for the selected plot. 
 	std::vector<float> intervals, colours;
 	std::string title;
-	if (vis[2])  //Colours by velocity
+	if (m_vis[2])  //Colours by velocity
 	{
 		for (int i = 0; i < 6; i++)
-			intervals.push_back(i*lidSpeed / 5.0);
-		colourScale.SetIntervals(&intervals);
+			intervals.push_back(i*m_lidSpeed / 5.0);
+		m_colourScale.SetIntervals(&intervals);
 
-		if (vis[1])   //Colour pallette 1
+		if (m_vis[1])   //Colour pallette 1
 			colours = { 0, 0, 1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, };   //blue, cyan, green, yellow, red, magenta
 		else          //Colour pallette 2
 			colours = { 1, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1 };   //magenta, red, yellow, green, cyan, blue
-		colourScale.SetColours(&colours, 6);
+		m_colourScale.SetColours(&colours, 6);
 
 		title = "speed[m/s]";
 	}
 	else       //Colours by cell tag
 	{
 		intervals = { FLUID, NOSLIPBC };
-		colourScale.SetIntervals(&intervals);
+		m_colourScale.SetIntervals(&intervals);
 		colours = { 0.2f, 0.6f, 1.0f, 0.4f, 0.2f, 0.f };   //light blue, brown.
-		colourScale.SetColours(&colours, 2);
+		m_colourScale.SetColours(&colours, 2);
 		title = "cell type";
 	}
 
 	//Draw and colour the cells of the domain.
 	glPushMatrix();
-	glScalef((0.9*win_width) / numCells, win_height / numCells, 1.);
+	glScalef((0.9*win_width) / m_numCells, win_height / m_numCells, 1.);
 	glShadeModel(GL_FLAT);
 	std::vector<float> ux, uy, mod;
 	float colourx, coloury, colourz;
 	bool inside;
-	for (int i = 0; i < numCells; i++)
+	for (int i = 0; i < m_numCells; i++)
 	{
 		glBegin(GL_TRIANGLE_STRIP);
-		for (int j = 0; j < numCells; j++)
+		for (int j = 0; j < m_numCells; j++)
 		{
 			//Extract velocity. The velocity has not to be divided by c for the lid. 
-			if (mesh[other][index(i, j)].BC == FIXEDV)
+			if (m_mesh[m_other][index(i, j)].BC == FIXEDV)
 			{
-				ux.push_back(mesh[other][index(i, j)].u[0]);
-				uy.push_back(mesh[other][index(i, j)].u[1]);
+				ux.push_back(m_mesh[m_other][index(i, j)].u[0]);
+				uy.push_back(m_mesh[m_other][index(i, j)].u[1]);
 			}
 			else
 			{
-				ux.push_back(mesh[other][index(i, j)].u[0] / m_c);
-				uy.push_back(mesh[other][index(i, j)].u[1] / m_c);
+				ux.push_back(m_mesh[m_other][index(i, j)].u[0] / m_c);
+				uy.push_back(m_mesh[m_other][index(i, j)].u[1] / m_c);
 			}
 			mod.push_back(sqrt(ux.back()*ux.back() + uy.back()*uy.back()));
-			if (vis[2])	 //Colours by velocity
+			if (m_vis[2])	 //Colours by velocity
 			{
-				inside = colourScale.PickColour(mod.back(), &colourx, &coloury, &colourz);
+				inside = m_colourScale.PickColour(mod.back(), &colourx, &coloury, &colourz);
 			}
 			else	//Colours by cell tag
 			{
-				inside = colourScale.PickColour((float)mesh[other][index(i, j)].tag, &colourx, &coloury, &colourz);
+				inside = m_colourScale.PickColour((float)m_mesh[m_other][index(i, j)].tag, &colourx, &coloury, &colourz);
 			}
 			if (!inside)
 			{
@@ -251,12 +251,12 @@ void LBMSolver::Render()
 
 
 	//Draw cell velocity vectors
-	if (vis[0])
+	if (m_vis[0])
 	{
 		glColor3f(0., 0.0, 0.);
-		for (int i = 0; i < numCells; i++)
+		for (int i = 0; i < m_numCells; i++)
 		{
-			for (int j = 0; j < numCells; j++)
+			for (int j = 0; j < m_numCells; j++)
 			{
 				glBegin(GL_LINE_STRIP);
 				glVertex2f(1 + j, 0.5 + i);
@@ -274,15 +274,15 @@ void LBMSolver::Render()
 	glPushMatrix();
 	glTranslatef(0.9*win_width, 0., 0.);
 	glScalef(0.1*win_width, win_height, 1.);
-	colourScale.DrawScale(title);
+	m_colourScale.DrawScale(title);
 	glPopMatrix();
 
 	//Draw time counter
 	std::ostringstream strs;
-	strs << std::setprecision(2) << t*dt << "s";
+	strs << std::setprecision(2) << m_t*m_dt << "s";
 	std::string time = strs.str();
 	glColor3f(1., 1., 1.);
-	colourScale.DrawText<std::string>(GLUT_BITMAP_HELVETICA_18, 0.9*win_width, 0.96*win_height, &time);
+	m_colourScale.DrawText<std::string>(GLUT_BITMAP_HELVETICA_18, 0.9*win_width, 0.96*win_height, &time);
 
 	glutSwapBuffers();
 
@@ -291,11 +291,11 @@ void LBMSolver::Render()
 
 LBMSolver::~LBMSolver()
 {
-	if (mesh)
+	if (m_mesh)
 	{
-		delete mesh[0];
-		delete mesh[1];
-		delete mesh;
+		delete m_mesh[0];
+		delete m_mesh[1];
+		delete m_mesh;
 	}
 
 }

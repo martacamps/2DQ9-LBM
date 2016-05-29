@@ -44,20 +44,20 @@ public:
 private:
 	float m_tau;							//relaxation time
 	float m_c;							//lattice speed
-	float sigma;						//surface tension parameter
-	float cellSize;	                //cell Size in meters
-	int numCells;						//number of cells in each direction
-	float dt;                          //lenght of each time step in seconds
-	float lidSpeed;                    //Horizontal Speed of the lid
-	float g;							//acceleration of gravity
-	int current, other;					//To differenciate between the current mesh and the auxiliar mesh
-	LBMCell **mesh;                     //LBM mesh
-	int index(int i, int j) { return i*numCells + j; }  //To access the mesh array as it was a 2D matrix.
-	const std::array<float, 9> w;		//Weights
-	const std::array<int, 9> ex;        //x direction of the velocity vectors
-	const std::array<int, 9> ey;        //y direction of the velocity vectors
-	std::valarray<float> exMod;        //x components of the velocity vectors
-	std::valarray<float> eyMod;        //y components of the velocity vectors
-	const std::array<int, 9> finv;      //Index of the velocity vector pointing in the opposite direction for each of the 9 velocity vectors. 
+	float m_sigma;						//surface tension parameter
+	float m_cellSize;	                //cell Size in meters
+	int m_numCells;						//number of cells in each direction
+	float m_dt;                          //lenght of each time step in seconds
+	float m_lidSpeed;                    //Horizontal Speed of the lid
+	float m_g;							//acceleration of gravity
+	int m_current, m_other;					//To differenciate between the current mesh and the auxiliar mesh
+	LBMCell **m_mesh;                     //LBM mesh
+	int index(int i, int j) { return i*m_numCells + j; }  //To access the mesh array as it was a 2D matrix.
+	const std::array<float, 9> m_w;		//Weights
+	const std::array<int, 9> m_ex;        //x direction of the velocity vectors
+	const std::array<int, 9> m_ey;        //y direction of the velocity vectors
+	std::valarray<float> m_exMod;        //x components of the velocity vectors
+	std::valarray<float> m_eyMod;        //y components of the velocity vectors
+	const std::array<int, 9> m_finv;      //Index of the velocity vector pointing in the opposite direction for each of the 9 velocity vectors. 
 };
 
