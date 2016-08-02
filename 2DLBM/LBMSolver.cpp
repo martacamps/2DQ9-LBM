@@ -135,8 +135,8 @@ void LBMSolver::TimeStep(float t)
 					ux += fi*m_exMod[l];
 					uy += fi*m_eyMod[l];
 				}
-				//ux = (ux*c)/rho;
-				//uy = (uy*c)/rho;
+				ux = ux/rho;
+				uy = uy/rho;
 			}
 			m_mesh[m_current][ij].rho = rho;
 			m_mesh[m_current][ij].u[0] = ux;
@@ -152,8 +152,8 @@ void LBMSolver::TimeStep(float t)
 			for (int l = 0; l < m_finv.size(); l++)
 			{
 				float eDotu = m_exMod[l] * ux + m_eyMod[l] * uy;
-				//float f0 = w[l] *rho*(1 - (3.*(ux*ux + uy*uy)) / (2.*c*c) + (3.*eDotu)/c  + (9.*eDotu*eDotu) / (2.*c*c));  
-				float f0 = m_w[l] * (rho - (3.*(ux*ux + uy*uy)) / (2.*m_c*m_c) + (3.*eDotu) / (m_c*m_c) + (9.*eDotu*eDotu) / (2.*m_c*m_c*m_c*m_c));
+				float f0 = m_w[l] *rho*(1 - (3.*(ux*ux + uy*uy)) / (2.*m_c*m_c) + (3.*eDotu)/(m_c*m_c)  + (9.*eDotu*eDotu) / (2.*m_c*m_c*m_c*m_c));  
+				//float f0 = m_w[l] * (rho - (3.*(ux*ux + uy*uy)) / (2.*m_c*m_c) + (3.*eDotu) / (m_c*m_c) + (9.*eDotu*eDotu) / (2.*m_c*m_c*m_c*m_c));
 				m_mesh[m_current][ij].f[l] = m_mesh[m_current][ij].f[l] - (1 / m_tau)*(m_mesh[m_current][ij].f[l] - f0);
 			}
 
