@@ -39,6 +39,6 @@ struct LBMCell
 	int BC = INTERNAL;         //FIXEDV if the cell velocity is fixed
 	bool newInterface = false; //true if the cell will change to a interface cell in the next step
 
-	LBMCell::LBMCell() : f({ { 4. / 9., 1. / 9., 1. / 9., 1. / 9., 1. / 9., 1. / 36., 1. / 36., 1. / 36., 1. / 36. } }), u({ { 0., 0. } }){}
+	LBMCell() : f({ { 4.f / 9.f, 1.f / 9.f, 1.f / 9.f, 1.f / 9.f, 1.f / 9.f, 1.f / 36.f, 1.f / 36.f, 1.f / 36.f, 1.f / 36.f } }), u({ { 0.f, 0.f } }){}
 
 }; 
